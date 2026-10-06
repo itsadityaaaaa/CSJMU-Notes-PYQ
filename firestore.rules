@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidResource(data) {
+      return data.title is string && data.title.size() > 0 &&
+             data.description is string &&
+             data.collegeId is string &&
+             data.courseId is string &&
+             data.subjectName is string &&
+             data.resourceType in ['NOTES', 'PYQ', 'SYLLABUS', 'FORMULA_SHEET'];
+    }
+
+    function isValidSubmission(data) {
+      return data.title is string && data.title.size() > 0 &&
+             data.description is string &&
+             data.collegeId is string &&
+             data.courseId is string &&
+             data.subjectName is string &&
+             data.userId is string &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'];
+    }
+
+    // Published Academic Resources Collection
+    match /resources/{resourceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidResource(request.resource.data);
+    }
+
+    // Moderation Queue Submissions
+    match /submissions/{submissionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.status == 'PENDING' &&
+                    isValidSubmission(request.resource.data);
+      allow update: if isAuthenticated() && isValidSubmission(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    // Student / Faculty User Profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+  }
+}

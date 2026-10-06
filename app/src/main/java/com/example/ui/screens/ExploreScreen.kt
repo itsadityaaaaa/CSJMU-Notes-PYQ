@@ -1,0 +1,371 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.repository.AcademicCatalog
+import com.example.domain.model.College
+import com.example.domain.model.Course
+import com.example.domain.model.ResourceType
+import com.example.ui.components.EmptyStateView
+import com.example.ui.components.ResourceCard
+import com.example.ui.theme.HeritageWinePrimary
+import com.example.ui.viewmodel.ResourceViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExploreScreen(
+    viewModel: ResourceViewModel,
+    onNavigateToUpload: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val filterState by viewModel.filterState.collectAsState()
+    val resources by viewModel.resources.collectAsState()
+    val selectedDetail by viewModel.selectedResourceDetail.collectAsState()
+
+    var showCollegeDropdown by remember { mutableStateOf(false) }
+    var showCourseDropdown by remember { mutableStateOf(false) }
+
+    val availableCourses = AcademicCatalog.getCoursesForCollege(filterState.selectedCollege.id)
+    val availableYears = AcademicCatalog.getYearsForCourse(filterState.selectedCourse)
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("explore_screen")
+    ) {
+        // Selector Section (College, Course, Year)
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                // College Dropdown Picker
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedCard(
+                        onClick = { showCollegeDropdown = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("college_selector_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Campus / College",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = filterState.selectedCollege.shortCode,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1
+                                )
+                            }
+                            Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select College")
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showCollegeDropdown,
+                        onDismissRequest = { showCollegeDropdown = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        AcademicCatalog.COLLEGES.forEach { college ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(text = college.name, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            text = college.location,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    viewModel.selectCollege(college)
+                                    showCollegeDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Course Selector Button
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedCard(
+                        onClick = { showCourseDropdown = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("course_selector_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Academic Course",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = filterState.selectedCourse.name,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1
+                                )
+                            }
+                            Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select Course")
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showCourseDropdown,
+                        onDismissRequest = { showCourseDropdown = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        availableCourses.forEach { course ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(text = course.name, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            text = "${course.code} • ${course.totalYears} Years",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    viewModel.selectCourse(course)
+                                    showCourseDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Year Filter Chips
+                Text(
+                    text = "Select Academic Year",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(availableYears) { year ->
+                        val isSelected = filterState.selectedYear.yearNumber == year.yearNumber
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.selectYear(year) },
+                            label = { Text(text = year.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = HeritageWinePrimary,
+                                selectedLabelColor = androidx.compose.ui.graphics.Color.White
+                            ),
+                            modifier = Modifier.testTag("year_chip_${year.yearNumber}")
+                        )
+                    }
+                }
+
+                // Semester Sub-chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterChip(
+                        selected = filterState.selectedSemester == null,
+                        onClick = { viewModel.selectSemester(null) },
+                        label = { Text("All Semesters") }
+                    )
+
+                    filterState.selectedYear.semesters.forEach { sem ->
+                        FilterChip(
+                            selected = filterState.selectedSemester == sem,
+                            onClick = { viewModel.selectSemester(sem) },
+                            label = { Text("Semester $sem") },
+                            modifier = Modifier.testTag("sem_chip_$sem")
+                        )
+                    }
+                }
+            }
+        }
+
+        // Search Bar & Resource Type Tabs
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            OutlinedTextField(
+                value = filterState.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                placeholder = { Text("Search by topic, unit, or subject name...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                trailingIcon = {
+                    if (filterState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = HeritageWinePrimary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("search_resources_input")
+            )
+        }
+
+        // Resource Type Tabs (All, Notes, PYQ, Syllabus)
+        val tabTypes = listOf(null, ResourceType.NOTES, ResourceType.PYQ, ResourceType.SYLLABUS)
+        val selectedTabIndex = tabTypes.indexOf(filterState.selectedResourceType)
+
+        ScrollableTabRow(
+            selectedTabIndex = if (selectedTabIndex >= 0) selectedTabIndex else 0,
+            edgePadding = 16.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            tabTypes.forEachIndexed { index, type ->
+                Tab(
+                    selected = (filterState.selectedResourceType == type),
+                    onClick = { viewModel.selectResourceType(type) },
+                    text = {
+                        Text(
+                            text = type?.displayName ?: "All Resources",
+                            fontWeight = if (filterState.selectedResourceType == type) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    modifier = Modifier.testTag("tab_${type?.name?.lowercase() ?: "all"}")
+                )
+            }
+        }
+
+        // Resources List or Empty State
+        if (resources.isEmpty()) {
+            EmptyStateView(
+                title = "No Verified Resources Found",
+                message = "No notes or previous year papers have been published yet for ${filterState.selectedCourse.code} (Year ${filterState.selectedYear.yearNumber}).\n\nUpload your class notes or PYQ now to contribute! It will be reviewed by admin before publication.",
+                icon = Icons.Default.MenuBook,
+                actionButtonText = "Upload Notes or PYQ",
+                onActionClick = onNavigateToUpload,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 24.dp)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Available Resources (${resources.size})",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                items(resources, key = { it.id }) { resource ->
+                    ResourceCard(
+                        resource = resource,
+                        onClick = { viewModel.openDetail(resource) }
+                    )
+                }
+            }
+        }
+    }
+
+    // Modal Bottom Sheet when an item is selected
+    selectedDetail?.let { resource ->
+        ResourceDetailBottomSheet(
+            resource = resource,
+            onDismiss = { viewModel.closeDetail() }
+        )
+    }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "CSJMU Notes & PYQ",
+  "description": "Academic resource repository for CSJMU Kanpur students. Access syllabus, lecture notes, and previous year question papers by college, course, and year, with student uploads and admin moderation workflow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

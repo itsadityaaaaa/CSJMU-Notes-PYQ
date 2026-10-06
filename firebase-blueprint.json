@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "Resource": {
+      "title": "Resource",
+      "description": "Published and verified academic resources including lecture notes and PYQs.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of academic note or paper" },
+        "description": { "type": "string", "description": "Detailed contents and unit coverage" },
+        "collegeId": { "type": "string", "description": "College or campus identifier" },
+        "courseId": { "type": "string", "description": "Course identifier" },
+        "academicYear": { "type": "number", "description": "Academic year 1 to 4" },
+        "semester": { "type": "number", "description": "Academic semester 1 to 8" },
+        "subjectId": { "type": "string", "description": "Subject identifier" },
+        "subjectName": { "type": "string", "description": "Descriptive subject name and code" },
+        "resourceType": { "type": "string", "enum": ["NOTES", "PYQ", "SYLLABUS", "FORMULA_SHEET"] },
+        "examYear": { "type": "string", "description": "Examination session year if PYQ" },
+        "fileUri": { "type": "string", "description": "File location or cloud URI" },
+        "fileName": { "type": "string", "description": "Attached document file name" },
+        "fileSizeFormatted": { "type": "string", "description": "Formatted file size string" },
+        "fileMimeType": { "type": "string", "description": "MIME type" },
+        "contributorName": { "type": "string", "description": "Name of contributing student" },
+        "contributorEmail": { "type": "string", "description": "Email of contributing student" },
+        "isApproved": { "type": "boolean", "description": "Approval status flag" },
+        "publishedTimestamp": { "type": "number", "description": "Unix timestamp in ms" },
+        "downloadCount": { "type": "number", "description": "Number of views or downloads" },
+        "userId": { "type": "string", "description": "Creator UID" }
+      },
+      "required": ["title", "description", "collegeId", "courseId", "academicYear", "semester", "subjectName", "resourceType", "isApproved"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Student resource submission awaiting admin moderation.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of uploaded document" },
+        "description": { "type": "string", "description": "Description of coverage and units" },
+        "collegeId": { "type": "string", "description": "College identifier" },
+        "courseId": { "type": "string", "description": "Course identifier" },
+        "courseName": { "type": "string", "description": "Course name" },
+        "academicYear": { "type": "number", "description": "Academic year" },
+        "semester": { "type": "number", "description": "Semester number" },
+        "subjectId": { "type": "string", "description": "Subject identifier" },
+        "subjectName": { "type": "string", "description": "Descriptive subject name" },
+        "resourceType": { "type": "string", "enum": ["NOTES", "PYQ", "SYLLABUS", "FORMULA_SHEET"] },
+        "examYear": { "type": "string", "description": "Exam year if PYQ" },
+        "fileUri": { "type": "string", "description": "Document URI" },
+        "fileName": { "type": "string", "description": "File name" },
+        "fileSizeFormatted": { "type": "string", "description": "Formatted size" },
+        "fileMimeType": { "type": "string", "description": "MIME type" },
+        "contributorName": { "type": "string", "description": "Contributor student name" },
+        "contributorEmail": { "type": "string", "description": "Contributor email" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "adminFeedback": { "type": "string", "description": "Moderator feedback notes" },
+        "submittedTimestamp": { "type": "number", "description": "Submission time" },
+        "reviewedTimestamp": { "type": "number", "description": "Review time" },
+        "userId": { "type": "string", "description": "Student submitter UID" }
+      },
+      "required": ["title", "description", "collegeId", "courseId", "academicYear", "semester", "subjectName", "resourceType", "status", "userId"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile for authenticated students and faculty.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email" },
+        "photoUrl": { "type": "string", "description": "User avatar" },
+        "role": { "type": "string", "enum": ["student", "faculty", "admin"] },
+        "createdAt": { "type": "number", "description": "Account created timestamp" }
+      },
+      "required": ["displayName", "email"]
+    }
+  },
+  "firestore": {
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/Resource" },
+      "description": "Published notes and PYQ catalog items verified by admins"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/Submission" },
+      "description": "Moderation queue submissions from students"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User account document"
+    }
+  }
+}
