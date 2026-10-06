@@ -8,12 +8,11 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import com.example.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -33,30 +32,28 @@ class FirebaseAuthManager(
         private const val TAG = "FirebaseAuthManager"
     }
 
-    private val auth: FirebaseAuth = Firebase.auth
+    private val auth: FirebaseAuth? = runCatching {
+        FirebaseApp.getApps(context).firstOrNull()?.let { FirebaseAuth.getInstance(it) }
+    }.getOrNull()
     private val credentialManager: CredentialManager = CredentialManager.create(context)
 
-    private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
+    private val _currentUser = MutableStateFlow<FirebaseUser?>(auth?.currentUser)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
 
     init {
-        auth.addAuthStateListener { firebaseAuth ->
+        auth?.addAuthStateListener { firebaseAuth ->
             _currentUser.value = firebaseAuth.currentUser
         }
     }
 
     fun attemptAutoSignIn() {
-        if (auth.currentUser != null) {
-            _currentUser.value = auth.currentUser
+        val firebaseAuth = auth ?: return
+        if (firebaseAuth.currentUser != null) {
+            _currentUser.value = firebaseAuth.currentUser
             return
         }
 
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            Log.w(TAG, "default_web_client_id not found for auto sign-in", e)
-            return
-        }
+        val clientId = getGoogleWebClientId() ?: return
 
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(true)
@@ -73,7 +70,7 @@ class FirebaseAuthManager(
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                    val authResult = auth.signInWithCredential(authCredential).await()
+                    val authResult = firebaseAuth.signInWithCredential(authCredential).await()
                     _currentUser.value = authResult.user
                 }
             } catch (e: Exception) {
@@ -88,9 +85,13 @@ class FirebaseAuthManager(
         onError: (String) -> Unit,
         onCancelled: () -> Unit = {}
     ) {
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
+        val firebaseAuth = auth
+        if (firebaseAuth == null) {
+            onError("Firebase is not configured for this build")
+            return
+        }
+        val clientId = getGoogleWebClientId()
+        if (clientId == null) {
             onError("Google Sign-In configuration missing: default_web_client_id not found")
             return
         }
@@ -105,7 +106,7 @@ class FirebaseAuthManager(
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                    val authResult = auth.signInWithCredential(authCredential).await()
+                    val authResult = firebaseAuth.signInWithCredential(authCredential).await()
                     val user = authResult.user
                     if (user != null) {
                         _currentUser.value = user
@@ -127,7 +128,7 @@ class FirebaseAuthManager(
     }
 
     fun signOut(onComplete: () -> Unit = {}) {
-        auth.signOut()
+        auth?.signOut()
         _currentUser.value = null
         scope.launch {
             try {
@@ -138,5 +139,14 @@ class FirebaseAuthManager(
                 onComplete()
             }
         }
+    }
+
+    private fun getGoogleWebClientId(): String? {
+        val resourceId = context.resources.getIdentifier(
+            "default_web_client_id",
+            "string",
+            context.packageName
+        )
+        return resourceId.takeIf { it != 0 }?.let(context::getString)?.takeIf { it.isNotBlank() }
     }
 }
