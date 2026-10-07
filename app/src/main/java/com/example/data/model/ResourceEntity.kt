@@ -21,6 +21,8 @@ data class ResourceEntity(
     val resourceType: ResourceType,
     val examYear: String? = null,
     val fileUri: String? = null,
+    val driveFileId: String? = null,
+    val driveFileUrl: String? = null,
     val fileName: String? = null,
     val fileSizeFormatted: String? = null,
     val fileMimeType: String? = null,
@@ -44,6 +46,8 @@ data class ResourceEntity(
         resourceType = resourceType,
         examYear = examYear,
         fileUri = fileUri,
+        driveFileId = driveFileId,
+        driveFileUrl = driveFileUrl,
         fileName = fileName,
         fileSizeFormatted = fileSizeFormatted,
         fileMimeType = fileMimeType,
@@ -69,6 +73,8 @@ data class ResourceEntity(
             resourceType = item.resourceType,
             examYear = item.examYear,
             fileUri = item.fileUri,
+            driveFileId = item.driveFileId,
+            driveFileUrl = item.driveFileUrl,
             fileName = item.fileName,
             fileSizeFormatted = item.fileSizeFormatted,
             fileMimeType = item.fileMimeType,
@@ -97,15 +103,19 @@ data class SubmissionEntity(
     val resourceType: ResourceType,
     val examYear: String? = null,
     val fileUri: String? = null,
+    val driveFileId: String? = null,
+    val driveFileUrl: String? = null,
     val fileName: String? = null,
     val fileSizeFormatted: String? = null,
     val fileMimeType: String? = null,
+    val fileSizeBytes: Long = 0L,
     val contributorName: String,
     val contributorEmail: String? = null,
     val status: ApprovalStatus = ApprovalStatus.PENDING,
     val adminFeedback: String? = null,
     val submittedTimestamp: Long = System.currentTimeMillis(),
-    val reviewedTimestamp: Long? = null
+    val reviewedTimestamp: Long? = null,
+    val expiresAt: Long = System.currentTimeMillis() + (3 * 24 * 60 * 60 * 1000L)
 ) {
     fun toDomain(): Submission = Submission(
         id = id,
@@ -121,15 +131,19 @@ data class SubmissionEntity(
         resourceType = resourceType,
         examYear = examYear,
         fileUri = fileUri,
+        driveFileId = driveFileId,
+        driveFileUrl = driveFileUrl,
         fileName = fileName,
         fileSizeFormatted = fileSizeFormatted,
         fileMimeType = fileMimeType,
+        fileSizeBytes = fileSizeBytes,
         contributorName = contributorName,
         contributorEmail = contributorEmail,
         status = status,
         adminFeedback = adminFeedback,
         submittedTimestamp = submittedTimestamp,
-        reviewedTimestamp = reviewedTimestamp
+        reviewedTimestamp = reviewedTimestamp,
+        expiresAt = expiresAt
     )
 
     companion object {
@@ -147,15 +161,19 @@ data class SubmissionEntity(
             resourceType = sub.resourceType,
             examYear = sub.examYear,
             fileUri = sub.fileUri,
+            driveFileId = sub.driveFileId,
+            driveFileUrl = sub.driveFileUrl,
             fileName = sub.fileName,
             fileSizeFormatted = sub.fileSizeFormatted,
             fileMimeType = sub.fileMimeType,
+            fileSizeBytes = sub.fileSizeBytes,
             contributorName = sub.contributorName,
             contributorEmail = sub.contributorEmail,
             status = sub.status,
             adminFeedback = sub.adminFeedback,
             submittedTimestamp = sub.submittedTimestamp,
-            reviewedTimestamp = sub.reviewedTimestamp
+            reviewedTimestamp = sub.reviewedTimestamp,
+            expiresAt = sub.expiresAt
         )
     }
 }
