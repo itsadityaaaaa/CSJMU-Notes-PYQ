@@ -108,14 +108,51 @@ fun UploadScreen(
     val availableCourses = AcademicCatalog.getCoursesForCollege(formState.college.id)
     val availableYears = AcademicCatalog.getYearsForCourse(formState.course)
 
-    // Android SAF File Picker restricted exclusively to PDF and JPG/JPEG
+    // Android SAF File Picker for single PDF or single JPG
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
             val (displayName, sizeFormatted) = getFileMetadata(context, uri)
             val mimeType = context.contentResolver.getType(uri) ?: ""
-            viewModel.setAttachedFile(uri, displayName, sizeFormatted, mimeType)
+            viewModel.setAttachedFileWithCompression(context, uri, displayName, sizeFormatted, mimeType)
+        }
+    }
+
+    // Android SAF Multiple Images Picker (allows selecting multiple JPG/JPEG pages at once)
+    val multiImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            if (uris.size == 1) {
+                val uri = uris.first()
+                val (displayName, sizeFormatted) = getFileMetadata(context, uri)
+                val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                viewModel.setAttachedFileWithCompression(context, uri, displayName, sizeFormatted, mimeType)
+            } else {
+                // Calculate total size across all selected images
+                var totalBytes = 0L
+                uris.forEach { u ->
+                    try {
+                        context.contentResolver.openFileDescriptor(u, "r")?.use { pfd ->
+                            totalBytes += pfd.statSize
+                        }
+                    } catch (_: Exception) {}
+                }
+                val totalFormatted = when {
+                    totalBytes >= 1024 * 1024 -> String.format("%.2f MB", totalBytes / (1024.0 * 1024.0))
+                    totalBytes >= 1024 -> String.format("%d KB", totalBytes / 1024)
+                    else -> "$totalBytes B"
+                }
+                val firstMetadata = getFileMetadata(context, uris.first())
+                val summaryName = firstMetadata.first.substringBeforeLast(".")
+                viewModel.setMultipleImagesWithCompression(
+                    context = context,
+                    uris = uris,
+                    initialSummaryName = summaryName,
+                    totalSizeFormatted = totalFormatted
+                )
+            }
         }
     }
 
@@ -499,62 +536,137 @@ fun UploadScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(12.dp)
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Description,
-                                    contentDescription = null,
-                                    tint = AcademicNavyPrimary
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = formState.attachedFileName ?: "Document",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color = NaturalTextPrimary,
-                                        maxLines = 1
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Description,
+                                        contentDescription = null,
+                                        tint = AcademicNavyPrimary
                                     )
-                                    Text(
-                                        text = "${formState.attachedFileSize ?: "Ready"} • Valid PDF/Image attached",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = NaturalTextSecondary
-                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = formState.attachedFileName ?: "Document",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = NaturalTextPrimary,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = "${formState.attachedFileSize ?: "Ready"} • Ready for upload",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = NaturalTextSecondary
+                                        )
+                                    }
+                                }
+
+                                IconButton(onClick = { viewModel.clearAttachedFile() }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove File", tint = NaturalTextSecondary)
                                 }
                             }
 
-                            IconButton(onClick = { viewModel.clearAttachedFile() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove File", tint = NaturalTextSecondary)
+                            if (formState.isCompressing) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = AcademicNavyPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Optimizing and compressing file (WhatsApp-style)...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AcademicNavyPrimary
+                                    )
+                                }
+                            } else if (formState.compressionSavingsText != null) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Surface(
+                                    color = EditorialSuccessContainer,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = EditorialSuccess,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = formState.compressionSavingsText ?: "",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                            color = EditorialSuccess
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 } else {
-                    OutlinedButton(
-                        onClick = {
-                            filePickerLauncher.launch(
-                                arrayOf(
-                                    "application/pdf",
-                                    "image/jpeg",
-                                    "image/jpg"
-                                )
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("choose_file_button"),
-                        shape = RoundedCornerShape(8.dp)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.AttachFile, contentDescription = null, tint = AcademicNavyPrimary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Select PDF or JPG/JPEG from Device", color = AcademicNavyPrimary)
+                        // Option 1: Select multiple JPG images in a single selection
+                        Button(
+                            onClick = {
+                                multiImagePickerLauncher.launch(
+                                    arrayOf(
+                                        "image/jpeg",
+                                        "image/jpg"
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("choose_multiple_images_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AcademicNavyPrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.UploadFile, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Select Multiple JPG Images (Compiles to PDF)")
+                        }
+
+                        // Option 2: Select single PDF or document from Device
+                        OutlinedButton(
+                            onClick = {
+                                filePickerLauncher.launch(
+                                    arrayOf(
+                                        "application/pdf",
+                                        "image/jpeg",
+                                        "image/jpg"
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("choose_file_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.AttachFile, contentDescription = null, tint = AcademicNavyPrimary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Select Single PDF Document or Photo", color = AcademicNavyPrimary)
+                        }
                     }
                 }
             }

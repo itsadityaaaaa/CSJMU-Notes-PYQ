@@ -28,4 +28,6 @@ interface IResourceRepository {
     suspend fun insertOrUpdateResource(resource: ResourceItem)
 
     suspend fun deleteResource(id: String)
+
+    suspend fun syncFromRemote(collegeId: String? = null, courseId: String? = null): Result<Unit>
 }

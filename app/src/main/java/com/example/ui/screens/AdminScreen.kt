@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Publish
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ThumbDown
@@ -48,6 +49,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -118,7 +120,15 @@ fun AdminScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val allSubmissions by viewModel.allSubmissions.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
     val context = LocalContext.current
+
+    // Sync cloud queue when entering Admin screen
+    LaunchedEffect(uiState.isAdminUnlocked) {
+        if (uiState.isAdminUnlocked) {
+            viewModel.refreshSubmissions()
+        }
+    }
 
     // Feedback message toast
     LaunchedEffect(uiState.actionSuccessMessage) {
@@ -207,20 +217,45 @@ fun AdminScreen(
                             }
                         }
 
-                        // Lock / Sign Out button
-                        OutlinedButton(
-                            onClick = { viewModel.lockAdminSession() },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f))
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("lock_admin_button")
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Lock", style = MaterialTheme.typography.labelSmall)
+                            // Sync from Cloud button
+                            IconButton(
+                                onClick = { viewModel.refreshSubmissions() },
+                                modifier = Modifier.testTag("admin_refresh_button")
+                            ) {
+                                if (isSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Sync Cloud Submissions",
+                                        tint = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            }
+
+                            // Lock / Sign Out button
+                            OutlinedButton(
+                                onClick = { viewModel.lockAdminSession() },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                                border = ButtonDefaults.outlinedButtonBorder.copy(
+                                    brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f))
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.testTag("lock_admin_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "Lock", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
 

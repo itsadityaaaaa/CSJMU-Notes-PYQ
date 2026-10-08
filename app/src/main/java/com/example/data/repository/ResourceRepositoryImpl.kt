@@ -68,4 +68,19 @@ class ResourceRepositoryImpl(
     override suspend fun deleteResource(id: String) {
         resourceDao.deleteById(id)
     }
+
+    override suspend fun syncFromRemote(collegeId: String?, courseId: String?): Result<Unit> {
+        return runCatching {
+            val remoteResult = remoteDataSource.fetchRemoteResources(
+                collegeId = collegeId ?: "",
+                courseId = courseId ?: "",
+                academicYear = 0,
+                semester = null
+            )
+            remoteResult.getOrNull()?.forEach { item ->
+                resourceDao.insertOrUpdate(ResourceEntity.fromDomain(item))
+            }
+            Unit
+        }
+    }
 }

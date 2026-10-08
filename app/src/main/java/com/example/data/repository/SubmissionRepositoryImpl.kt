@@ -251,4 +251,14 @@ class SubmissionRepositoryImpl(
             )
         }
     }
+
+    override suspend fun syncFromRemote(): Result<Unit> {
+        return runCatching {
+            val remoteResult = remoteDataSource.fetchAllRemoteSubmissions()
+            remoteResult.getOrNull()?.forEach { sub ->
+                submissionDao.insertSubmission(SubmissionEntity.fromDomain(sub))
+            }
+            Unit
+        }
+    }
 }

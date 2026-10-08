@@ -23,7 +23,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -41,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,12 +74,18 @@ fun ExploreScreen(
     val filterState by viewModel.filterState.collectAsState()
     val resources by viewModel.resources.collectAsState()
     val selectedDetail by viewModel.selectedResourceDetail.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     var showCollegeDropdown by remember { mutableStateOf(false) }
     var showCourseDropdown by remember { mutableStateOf(false) }
 
     val availableCourses = AcademicCatalog.getCoursesForCollege(filterState.selectedCollege.id)
     val availableYears = AcademicCatalog.getYearsForCourse(filterState.selectedCourse)
+
+    // Synchronize catalog from cloud on load
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
 
     Column(
         modifier = modifier
@@ -94,6 +103,40 @@ fun ExploreScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
+                // Header with refresh button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "CSJMU Notes & PYQ Repository",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    IconButton(
+                        onClick = { viewModel.refresh() },
+                        modifier = Modifier.testTag("refresh_explore_button")
+                    ) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = HeritageWinePrimary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh from Cloud",
+                                tint = HeritageWinePrimary
+                            )
+                        }
+                    }
+                }
+
                 // College Dropdown Picker
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedCard(

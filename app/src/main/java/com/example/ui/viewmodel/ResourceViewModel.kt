@@ -44,6 +44,21 @@ class ResourceViewModel(
     private val _selectedResourceDetail = MutableStateFlow<ResourceItem?>(null)
     val selectedResourceDetail: StateFlow<ResourceItem?> = _selectedResourceDetail.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                val state = _filterState.value
+                getResourcesUseCase.refresh(state.selectedCollege.id, state.selectedCourse.id)
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val resources: StateFlow<List<ResourceItem>> = _filterState
         .flatMapLatest { filter ->

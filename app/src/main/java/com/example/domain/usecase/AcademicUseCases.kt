@@ -20,6 +20,10 @@ class GetResourcesUseCase(
     ): Flow<List<ResourceItem>> {
         return repository.getResources(collegeId, courseId, academicYear, semester, resourceType)
     }
+
+    suspend fun refresh(collegeId: String? = null, courseId: String? = null): Result<Unit> {
+        return repository.syncFromRemote(collegeId, courseId)
+    }
 }
 
 class SearchResourcesUseCase(

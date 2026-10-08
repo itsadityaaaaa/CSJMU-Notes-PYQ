@@ -47,6 +47,20 @@ class AdminViewModel(
 
     private var countdownJob: Job? = null
 
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    fun refreshSubmissions() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                submissionRepository.syncFromRemote()
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+
     val allSubmissions: StateFlow<List<Submission>> = submissionRepository.getAllSubmissions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
