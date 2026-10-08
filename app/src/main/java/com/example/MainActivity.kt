@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
 
         // 3. Cloud-Synchronized Repositories
         val resourceRepository = ResourceRepositoryImpl(resourceDao, remoteDataSource, lifecycleScope)
-        val submissionRepository = SubmissionRepositoryImpl(submissionDao, resourceDao, remoteDataSource, lifecycleScope)
+        val submissionRepository = SubmissionRepositoryImpl(submissionDao, resourceDao, remoteDataSource, lifecycleScope, applicationContext)
 
         // 4. Clean Architecture Use Cases
         val getResourcesUseCase = GetResourcesUseCase(resourceRepository)

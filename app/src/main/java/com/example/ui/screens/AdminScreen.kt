@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Publish
 import androidx.compose.material.icons.filled.Save
@@ -679,6 +682,7 @@ fun ModerationReviewBottomSheet(
     onApprove: (adminNotes: String) -> Unit,
     onReject: (reason: String) -> Unit
 ) {
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var adminNotes by remember {
         mutableStateOf("Verified syllabus alignment & clarity. Approved for CSJMU catalog.")
@@ -786,11 +790,24 @@ fun ModerationReviewBottomSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // File Attachment Card
+            // File Attachment Card with Preview / Open action
+            val targetPreviewUrl = submission.driveFileUrl ?: submission.fileUri
             Card(
                 colors = CardDefaults.cardColors(containerColor = AcademicNavyContainer),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        if (!targetPreviewUrl.isNullOrBlank()) {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetPreviewUrl))
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "Cannot open PDF preview", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
             ) {
                 Row(
                     modifier = Modifier
@@ -804,17 +821,36 @@ fun ModerationReviewBottomSheet(
                         tint = AcademicNavyPrimary
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = submission.fileName ?: "Academic_Document.pdf",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = NaturalTextPrimary
                         )
                         Text(
-                            text = "${submission.fileSizeFormatted ?: "Ready"} • Attached by student",
+                            text = "${submission.fileSizeFormatted ?: "Ready"} • Tap to Preview / Open in Drive",
                             style = MaterialTheme.typography.bodySmall,
                             color = NaturalTextSecondary
                         )
+                    }
+                    if (!targetPreviewUrl.isNullOrBlank()) {
+                        IconButton(
+                            onClick = {
+                                runCatching {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetPreviewUrl))
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                }.onFailure {
+                                    Toast.makeText(context, "Cannot open PDF preview", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInNew,
+                                contentDescription = "Preview PDF",
+                                tint = AcademicNavyPrimary
+                            )
+                        }
                     }
                 }
             }
