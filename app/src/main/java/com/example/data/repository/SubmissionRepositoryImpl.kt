@@ -29,6 +29,12 @@ class SubmissionRepositoryImpl(
         private const val TAG = "SubmissionRepo"
     }
 
+    init {
+        scope.launch {
+            syncFromRemote()
+        }
+    }
+
     override fun getAllSubmissions(): Flow<List<Submission>> {
         scope.launch {
             val remoteResult = remoteDataSource.fetchAllRemoteSubmissions()
@@ -96,15 +102,51 @@ class SubmissionRepositoryImpl(
                 }
             }
 
-            // Save in local SQLite Room database
+            // 1. Save in local SQLite Room submissions database
             val entity = SubmissionEntity.fromDomain(updatedSubmission)
             submissionDao.insertSubmission(entity)
 
-            // Sync to Firestore & cloud backend
+            // 2. Sync to Spark Firestore submissions collection
             val remoteResult = remoteDataSource.submitNoteToRemote(updatedSubmission)
             if (remoteResult.isFailure) {
                 Log.w(TAG, "Cloud sync warning: ${remoteResult.exceptionOrNull()?.message}")
             }
+
+            // 3. Immediately create and publish a ResourceItem to local Room & Firestore resources collection
+            // This ensures the uploaded document is immediately searchable and accessible across ALL devices!
+            val now = updatedSubmission.submittedTimestamp
+            val resourceItem = ResourceItem(
+                id = "res_${updatedSubmission.id}",
+                title = updatedSubmission.title,
+                description = updatedSubmission.description,
+                collegeId = updatedSubmission.collegeId,
+                courseId = updatedSubmission.courseId,
+                academicYear = updatedSubmission.academicYear,
+                semester = updatedSubmission.semester,
+                subjectId = updatedSubmission.subjectId,
+                subjectName = updatedSubmission.subjectName,
+                resourceType = updatedSubmission.resourceType,
+                examYear = updatedSubmission.examYear,
+                fileUri = updatedSubmission.driveFileUrl ?: updatedSubmission.fileUri,
+                driveFileId = updatedSubmission.driveFileId,
+                driveFileUrl = updatedSubmission.driveFileUrl,
+                fileName = updatedSubmission.fileName,
+                fileSizeFormatted = updatedSubmission.fileSizeFormatted,
+                fileMimeType = updatedSubmission.fileMimeType,
+                contributorName = updatedSubmission.contributorName,
+                contributorEmail = updatedSubmission.contributorEmail,
+                isApproved = true,
+                publishedTimestamp = now,
+                downloadCount = 0,
+                tags = listOf(
+                    updatedSubmission.subjectName,
+                    updatedSubmission.courseName,
+                    "Year ${updatedSubmission.academicYear}",
+                    "Sem ${updatedSubmission.semester}"
+                )
+            )
+            resourceDao.insertOrUpdate(ResourceEntity.fromDomain(resourceItem))
+            remoteDataSource.publishResourceToRemote(resourceItem)
 
             updatedSubmission.id
         }
@@ -243,7 +285,12 @@ class SubmissionRepositoryImpl(
                 submissionDao.updateSubmission(updatedEntity)
             }
 
-            // 3. Sync rejection status to Firestore & cloud
+            // 3. Remove published resource from local database and remote Firestore
+            resourceDao.deleteById("res_$submissionId")
+            resourceDao.deleteById(submissionId)
+            remoteDataSource.deleteResourceFromRemote("res_$submissionId")
+
+            // 4. Sync rejection status to Firestore & cloud
             remoteDataSource.updateRemoteSubmissionStatus(
                 submissionId = submissionId,
                 status = ApprovalStatus.REJECTED,

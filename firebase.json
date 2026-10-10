@@ -1,6 +1,10 @@
 {
   "firestore": [
     {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
       "database": "ai-studio-android-csjmunot-62035690-ec69-4303-9580-c20e23673401",
       "rules": "firestore.rules"
     }

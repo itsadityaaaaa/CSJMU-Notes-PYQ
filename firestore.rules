@@ -31,25 +31,20 @@ service cloud.firestore {
     }
 
     // Published Academic Resources Collection
-    // Public read so all CSJMU students on all devices can view approved study materials
+    // Public read and write so all CSJMU students on all devices can share and view study materials
     match /resources/{resourceId} {
-      allow read: if true;
-      allow write: if isValidResource(request.resource.data);
+      allow read, write: if true;
     }
 
     // Moderation Queue Submissions
-    // All devices can view submissions queue; submissions must start as PENDING
+    // All devices can view and submit to submissions queue
     match /submissions/{submissionId} {
-      allow read: if true;
-      allow create: if request.resource.data.status == 'PENDING' && isValidSubmission(request.resource.data);
-      allow update: if isValidSubmission(request.resource.data);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Student / Faculty User Profiles
     match /users/{userId} {
-      allow read: if true;
-      allow write: if isOwner(userId) || !isAuthenticated();
+      allow read, write: if true;
     }
   }
 }

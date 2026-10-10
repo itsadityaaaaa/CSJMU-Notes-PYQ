@@ -65,8 +65,8 @@ class ResourceViewModel(
             if (filter.searchQuery.isNotBlank()) {
                 searchResourcesUseCase(
                     query = filter.searchQuery.trim(),
-                    collegeId = filter.selectedCollege.id,
-                    courseId = filter.selectedCourse.id
+                    collegeId = null,
+                    courseId = null
                 )
             } else {
                 getResourcesUseCase(

@@ -18,6 +18,12 @@ class ResourceRepositoryImpl(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) : IResourceRepository {
 
+    init {
+        scope.launch {
+            syncFromRemote()
+        }
+    }
+
     override fun getResources(
         collegeId: String,
         courseId: String,
@@ -52,6 +58,10 @@ class ResourceRepositoryImpl(
         collegeId: String?,
         courseId: String?
     ): Flow<List<ResourceItem>> {
+        // Trigger background sync to ensure latest uploaded notes are cached in Room
+        scope.launch {
+            syncFromRemote(collegeId, courseId)
+        }
         return resourceDao.searchResources(query, collegeId, courseId)
             .map { entities -> entities.map { it.toDomain() } }
     }

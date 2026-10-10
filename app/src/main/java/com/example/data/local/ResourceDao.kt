@@ -31,7 +31,9 @@ interface ResourceDao {
         SELECT * FROM resources 
         WHERE (title LIKE '%' || :query || '%' 
            OR description LIKE '%' || :query || '%' 
-           OR subjectName LIKE '%' || :query || '%')
+           OR subjectName LIKE '%' || :query || '%'
+           OR fileName LIKE '%' || :query || '%'
+           OR contributorName LIKE '%' || :query || '%')
           AND (:collegeId IS NULL OR collegeId = :collegeId)
           AND (:courseId IS NULL OR courseId = :courseId)
         ORDER BY publishedTimestamp DESC

@@ -67,15 +67,25 @@ interface IRemoteResourceDataSource {
         adminNotes: String?
     ): Result<Unit>
 
+    suspend fun deleteResourceFromRemote(resourceId: String): Result<Unit>
+
     suspend fun approveDocumentInDrive(driveFileId: String?): Result<Unit>
 
     suspend fun rejectDocumentInDrive(driveFileId: String?): Result<Unit>
 }
 
 class RemoteResourceDataSourceImpl(
-    private val firestore: FirebaseFirestore?,
+    private val defaultFirestore: FirebaseFirestore?,
+    private val namedFirestore: FirebaseFirestore? = null,
     private val backendUrl: String? = null
 ) : IRemoteResourceDataSource {
+
+    // Secondary constructor for compatibility
+    constructor(firestore: FirebaseFirestore?, backendUrl: String?) : this(
+        defaultFirestore = firestore,
+        namedFirestore = null,
+        backendUrl = backendUrl
+    )
 
     companion object {
         private const val TAG = "RemoteDataSource"
@@ -91,22 +101,20 @@ class RemoteResourceDataSourceImpl(
                 null
             }
 
-            // Initialize Firestore with fallback to default instance
-            val db: FirebaseFirestore? = runCatching {
-                if (!dbId.isNullOrBlank()) {
-                    try {
-                        FirebaseFirestore.getInstance(dbId)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Named Firestore DB ($dbId) init failed; using default instance", e)
-                        FirebaseFirestore.getInstance()
-                    }
-                } else {
-                    FirebaseFirestore.getInstance()
-                }
+            // In Firebase Spark plan, the real database is always FirebaseFirestore.getInstance() (default)
+            val defaultDb: FirebaseFirestore? = runCatching {
+                FirebaseFirestore.getInstance()
             }.getOrElse { e ->
-                Log.e(TAG, "FirebaseFirestore initialization error", e)
+                Log.e(TAG, "Default FirebaseFirestore initialization error", e)
                 null
             }
+
+            // Also obtain named instance if configured
+            val namedDb: FirebaseFirestore? = runCatching {
+                if (!dbId.isNullOrBlank() && dbId != "(default)") {
+                    FirebaseFirestore.getInstance(dbId)
+                } else null
+            }.getOrNull()
 
             // Resolved Google Apps Script Web App URL from strings.xml or default constant
             val appsScriptUrl = try {
@@ -116,8 +124,15 @@ class RemoteResourceDataSourceImpl(
                 null
             } ?: DEFAULT_APPS_SCRIPT_URL
 
-            return RemoteResourceDataSourceImpl(db, appsScriptUrl)
+            return RemoteResourceDataSourceImpl(defaultDb, namedDb, appsScriptUrl)
         }
+    }
+
+    private fun getFirestoreInstances(): List<FirebaseFirestore> {
+        val list = mutableListOf<FirebaseFirestore>()
+        defaultFirestore?.let { list.add(it) }
+        namedFirestore?.let { if (it != defaultFirestore) list.add(it) }
+        return list
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -137,16 +152,21 @@ class RemoteResourceDataSourceImpl(
         runCatching {
             val itemsMap = mutableMapOf<String, ResourceItem>()
 
-            // 1. Fetch from Firestore if available
-            if (firestore != null) {
+            // 1. Fetch from Firestore instances (Spark default & named db)
+            for (db in getFirestoreInstances()) {
                 try {
-                    var query: Query = firestore.collection(COLLECTION_RESOURCES)
-                        .whereEqualTo("collegeId", collegeId)
-                        .whereEqualTo("courseId", courseId)
-                        .whereEqualTo("academicYear", academicYear)
-                        .whereEqualTo("isApproved", true)
-
-                    if (semester != null) {
+                    // Try targeted query if specific filters were provided
+                    var query: Query = db.collection(COLLECTION_RESOURCES)
+                    if (collegeId.isNotBlank()) {
+                        query = query.whereEqualTo("collegeId", collegeId)
+                    }
+                    if (courseId.isNotBlank()) {
+                        query = query.whereEqualTo("courseId", courseId)
+                    }
+                    if (academicYear > 0) {
+                        query = query.whereEqualTo("academicYear", academicYear)
+                    }
+                    if (semester != null && semester > 0) {
                         query = query.whereEqualTo("semester", semester)
                     }
 
@@ -156,12 +176,39 @@ class RemoteResourceDataSourceImpl(
                             itemsMap[it.id] = it
                         }
                     }
+
+                    // In-memory fallback if targeted query returned empty or needed broad match
+                    if (itemsMap.isEmpty()) {
+                        val allDocs = db.collection(COLLECTION_RESOURCES).get().await()
+                        for (doc in allDocs.documents) {
+                            mapDocToResource(doc, collegeId, courseId, academicYear)?.let { res ->
+                                val matchesCollege = collegeId.isBlank() || res.collegeId.isBlank() || res.collegeId == collegeId
+                                val matchesCourse = courseId.isBlank() || res.courseId.isBlank() || res.courseId == courseId
+                                val matchesYear = academicYear <= 0 || res.academicYear == 0 || res.academicYear == academicYear
+                                val matchesSem = semester == null || semester <= 0 || res.semester == 0 || res.semester == semester
+
+                                if (matchesCollege && matchesCourse && matchesYear && matchesSem) {
+                                    itemsMap.putIfAbsent(res.id, res)
+                                }
+                            }
+                        }
+                    }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Firestore query for resources failed, falling back to Apps Script: ${e.message}")
+                    Log.w(TAG, "Firestore query for resources error: ${e.message}")
+                    try {
+                        val allDocs = db.collection(COLLECTION_RESOURCES).get().await()
+                        for (doc in allDocs.documents) {
+                            mapDocToResource(doc, collegeId, courseId, academicYear)?.let { res ->
+                                itemsMap.putIfAbsent(res.id, res)
+                            }
+                        }
+                    } catch (e2: Exception) {
+                        Log.w(TAG, "Fallback collection fetch error: ${e2.message}")
+                    }
                 }
             }
 
-            // 2. Fetch approved resources from Google Apps Script backend
+            // 2. Fetch approved resources from Google Apps Script backend if configured
             if (!backendUrl.isNullOrBlank()) {
                 try {
                     val requestUrl = "$backendUrl?action=getApproved"
@@ -200,7 +247,6 @@ class RemoteResourceDataSourceImpl(
 
     override suspend fun publishResourceToRemote(resource: ResourceItem): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val db = firestore
             val currentUserId = runCatching { Firebase.auth.currentUser?.uid }.getOrNull() ?: "csjmu_student"
 
             val payload = mapOf(
@@ -229,12 +275,13 @@ class RemoteResourceDataSourceImpl(
                 "userId" to currentUserId
             )
 
-            if (db != null) {
+            for (db in getFirestoreInstances()) {
                 try {
                     db.collection(COLLECTION_RESOURCES)
                         .document(resource.id)
                         .set(payload)
                         .await()
+                    Log.i(TAG, "Resource published to Firestore: ${resource.id}")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error publishing resource to Firestore", e)
                 }
@@ -328,7 +375,6 @@ class RemoteResourceDataSourceImpl(
 
     override suspend fun submitNoteToRemote(submission: Submission): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            val db = firestore
             val currentUserId = runCatching { Firebase.auth.currentUser?.uid }.getOrNull() ?: "csjmu_student"
 
             val payload = mapOf(
@@ -360,7 +406,7 @@ class RemoteResourceDataSourceImpl(
                 "userId" to currentUserId
             )
 
-            if (db != null) {
+            for (db in getFirestoreInstances()) {
                 try {
                     db.collection(COLLECTION_SUBMISSIONS)
                         .document(submission.id)
@@ -381,28 +427,26 @@ class RemoteResourceDataSourceImpl(
             val itemsMap = mutableMapOf<String, Submission>()
             val now = System.currentTimeMillis()
 
-            // 1. Fetch from Firestore
-            if (firestore != null) {
+            // 1. Fetch from Firestore instances (Spark default & named db)
+            for (db in getFirestoreInstances()) {
                 try {
-                    val snapshot = firestore.collection(COLLECTION_SUBMISSIONS)
-                        .whereEqualTo("status", ApprovalStatus.PENDING.name)
-                        .get()
-                        .await()
-
+                    val snapshot = db.collection(COLLECTION_SUBMISSIONS).get().await()
                     for (doc in snapshot.documents) {
                         val sub = mapDocToSubmission(doc) ?: continue
-                        if (sub.expiresAt <= now) {
-                            runCatching { doc.reference.delete() }
-                        } else {
-                            itemsMap[sub.id] = sub
+                        if (sub.status == ApprovalStatus.PENDING) {
+                            if (sub.expiresAt <= now) {
+                                runCatching { doc.reference.delete() }
+                            } else {
+                                itemsMap[sub.id] = sub
+                            }
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Firestore pending submissions query failed: ${e.message}")
+                    Log.w(TAG, "Firestore pending submissions query error: ${e.message}")
                 }
             }
 
-            // 2. Fetch from Google Apps Script Web App
+            // 2. Fetch from Google Apps Script Web App if configured
             if (!backendUrl.isNullOrBlank()) {
                 try {
                     val requestUrl = "$backendUrl?action=getPending"
@@ -436,19 +480,19 @@ class RemoteResourceDataSourceImpl(
         runCatching {
             val itemsMap = mutableMapOf<String, Submission>()
 
-            // 1. Fetch from Firestore
-            if (firestore != null) {
+            // 1. Fetch from Firestore instances (Spark default & named db)
+            for (db in getFirestoreInstances()) {
                 try {
-                    val snapshot = firestore.collection(COLLECTION_SUBMISSIONS).get().await()
+                    val snapshot = db.collection(COLLECTION_SUBMISSIONS).get().await()
                     for (doc in snapshot.documents) {
                         mapDocToSubmission(doc)?.let { itemsMap[it.id] = it }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Firestore all submissions query failed: ${e.message}")
+                    Log.w(TAG, "Firestore all submissions query error: ${e.message}")
                 }
             }
 
-            // 2. Fetch from Google Apps Script backend
+            // 2. Fetch from Google Apps Script backend if configured
             if (!backendUrl.isNullOrBlank()) {
                 try {
                     val requestUrl = "$backendUrl?action=getAll"
@@ -489,14 +533,14 @@ class RemoteResourceDataSourceImpl(
                 updates["adminFeedback"] = adminNotes
             }
 
-            if (firestore != null) {
+            for (db in getFirestoreInstances()) {
                 try {
-                    firestore.collection(COLLECTION_SUBMISSIONS)
+                    db.collection(COLLECTION_SUBMISSIONS)
                         .document(submissionId)
                         .update(updates)
                         .await()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Firestore update submission status failed: ${e.message}")
+                    Log.w(TAG, "Firestore update submission status error: ${e.message}")
                 }
             }
 
@@ -520,6 +564,23 @@ class RemoteResourceDataSourceImpl(
                 }
             }
 
+            Unit
+        }
+    }
+
+    override suspend fun deleteResourceFromRemote(resourceId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            for (db in getFirestoreInstances()) {
+                try {
+                    db.collection(COLLECTION_RESOURCES)
+                        .document(resourceId)
+                        .delete()
+                        .await()
+                    Log.i(TAG, "Deleted resource $resourceId from Firestore")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Firestore delete resource error: ${e.message}")
+                }
+            }
             Unit
         }
     }
