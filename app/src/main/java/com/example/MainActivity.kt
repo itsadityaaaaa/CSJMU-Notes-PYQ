@@ -173,8 +173,7 @@ fun MainApp(
         topBar = {
             AcademicHeader(
                 isDarkTheme = isDarkTheme,
-                onToggleTheme = onToggleTheme,
-                onAdminClick = { currentTab = NavigationTab.ADMIN }
+                onToggleTheme = onToggleTheme
             )
         },
         bottomBar = {

@@ -79,6 +79,7 @@ fun ExploreScreen(
 
     var showCollegeDropdown by remember { mutableStateOf(false) }
     var showCourseDropdown by remember { mutableStateOf(false) }
+    var showYearDropdown by remember { mutableStateOf(false) }
 
     val availableCourses = AcademicCatalog.getCoursesForCollege(filterState.selectedCollege.id)
     val availableYears = AcademicCatalog.getYearsForCourse(filterState.selectedCourse)
@@ -260,37 +261,60 @@ fun ExploreScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Year Filter Chips
-                Text(
-                    text = "Select Academic Year",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(availableYears) { year ->
-                        val isSelected = filterState.selectedYear.yearNumber == year.yearNumber
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.selectYear(year) },
-                            label = {
+                // Academic Year Dropdown Picker (100% responsive, full 4-year support)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedCard(
+                        onClick = { showYearDropdown = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("year_selector_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = year.label,
-                                    maxLines = 1,
-                                    softWrap = false
+                                    text = "Academic Year",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            modifier = Modifier.testTag("year_chip_${year.yearNumber}")
-                        )
+                                Text(
+                                    text = filterState.selectedYear.label,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select Academic Year")
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showYearDropdown,
+                        onDismissRequest = { showYearDropdown = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        availableYears.forEach { year ->
+                            val isSelected = filterState.selectedYear.yearNumber == year.yearNumber
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = year.label,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                onClick = {
+                                    viewModel.selectYear(year)
+                                    showYearDropdown = false
+                                }
+                            )
+                        }
                     }
                 }
             }

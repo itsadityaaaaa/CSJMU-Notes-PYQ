@@ -104,6 +104,7 @@ fun UploadScreen(
 
     var showCollegeMenu by remember { mutableStateOf(false) }
     var showCourseMenu by remember { mutableStateOf(false) }
+    var showYearMenu by remember { mutableStateOf(false) }
 
     val availableCourses = AcademicCatalog.getCoursesForCollege(formState.college.id)
     val availableYears = AcademicCatalog.getYearsForCourse(formState.course)
@@ -330,44 +331,85 @@ fun UploadScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Year & Semester Chips (No asterisk)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Year", style = MaterialTheme.typography.labelMedium, color = NaturalTextSecondary)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    availableYears.forEach { yr ->
-                        FilterChip(
-                            selected = formState.year.yearNumber == yr.yearNumber,
-                            onClick = { viewModel.updateYear(yr) },
-                            label = { Text("Yr ${yr.yearNumber}") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AcademicNavyPrimary,
-                                selectedLabelColor = Color.White
+        // Academic Year Dropdown Picker (Full 4-Year Support, completely responsive)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedCard(
+                onClick = { showYearMenu = true },
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("upload_year_select"),
+                colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Academic Year",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = AcademicNavyPrimary
                             )
+                            Text(
+                                text = " *",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = EditorialError
+                            )
+                        }
+                        Text(
+                            text = formState.year.label,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = NaturalTextPrimary
                         )
                     }
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NaturalTextSecondary)
                 }
             }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Semester", style = MaterialTheme.typography.labelMedium, color = NaturalTextSecondary)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    formState.year.semesters.forEach { sem ->
-                        FilterChip(
-                            selected = formState.semester == sem,
-                            onClick = { viewModel.updateSemester(sem) },
-                            label = { Text("Sem $sem") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AcademicNavyPrimary,
-                                selectedLabelColor = Color.White
+            DropdownMenu(expanded = showYearMenu, onDismissRequest = { showYearMenu = false }) {
+                availableYears.forEach { yr ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = yr.label,
+                                color = NaturalTextPrimary,
+                                fontWeight = if (formState.year.yearNumber == yr.yearNumber) FontWeight.Bold else FontWeight.Normal
                             )
+                        },
+                        onClick = {
+                            viewModel.updateYear(yr)
+                            showYearMenu = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Semester Selection Chips
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Academic Semester",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = AcademicNavyPrimary
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                formState.year.semesters.forEach { sem ->
+                    FilterChip(
+                        selected = formState.semester == sem,
+                        onClick = { viewModel.updateSemester(sem) },
+                        label = { Text("Semester $sem") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AcademicNavyPrimary,
+                            selectedLabelColor = Color.White
                         )
-                    }
+                    )
                 }
             }
         }
@@ -437,10 +479,10 @@ fun UploadScreen(
             )
         }
 
-        // --- STEP 3: RESOURCE MATERIAL & DESCRIPTION ---
+        // --- STEP 3: RESOURCE MATERIAL & TYPE ---
         Spacer(modifier = Modifier.height(22.dp))
         Text(
-            text = "3. Resource Type & Description",
+            text = "3. Resource Material & Type",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = AcademicNavyPrimary
         )
@@ -477,36 +519,6 @@ fun UploadScreen(
                 shape = RoundedCornerShape(10.dp)
             )
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Resource Title (NO asterisk)
-        OutlinedTextField(
-            value = formState.title,
-            onValueChange = { viewModel.updateTitle(it) },
-            label = { Text("Resource Title (Optional)") },
-            placeholder = { Text("e.g. Complete Handwritten Notes with Solved Diagrams") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("upload_title_input"),
-            shape = RoundedCornerShape(10.dp)
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Detailed Description (NO asterisk)
-        OutlinedTextField(
-            value = formState.description,
-            onValueChange = { viewModel.updateDescription(it) },
-            label = { Text("Detailed Description (Optional)") },
-            placeholder = { Text("Describe topics covered, important units, exam questions included...") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp)
-                .testTag("upload_desc_input"),
-            shape = RoundedCornerShape(10.dp),
-            maxLines = 5
-        )
 
         Spacer(modifier = Modifier.height(14.dp))
 
