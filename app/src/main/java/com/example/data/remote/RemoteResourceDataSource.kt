@@ -630,6 +630,17 @@ class RemoteResourceDataSourceImpl(
         defaultYear: Int
     ): ResourceItem? {
         val data = doc.data ?: return null
+        val rawFileUri = data["fileUri"] as? String
+        val rawDriveUrl = data["driveFileUrl"] as? String
+        var rawDriveId = data["driveFileId"] as? String
+        if (rawDriveId.isNullOrBlank()) {
+            rawDriveId = com.example.util.DocumentViewerUtil.extractDriveFileId(rawDriveUrl ?: rawFileUri)
+        }
+        val effectiveUrl = rawDriveUrl?.takeIf { it.isNotBlank() }
+            ?: (if (rawFileUri?.startsWith("http") == true) rawFileUri else null)
+            ?: rawDriveId?.let { "https://drive.google.com/file/d/$it/view?usp=sharing" }
+            ?: rawFileUri
+
         return ResourceItem(
             id = doc.id,
             title = data["title"] as? String ?: "",
@@ -644,9 +655,9 @@ class RemoteResourceDataSourceImpl(
                 ResourceType.valueOf(data["resourceType"] as? String ?: "NOTES")
             }.getOrDefault(ResourceType.NOTES),
             examYear = data["examYear"] as? String,
-            fileUri = data["fileUri"] as? String,
-            driveFileId = data["driveFileId"] as? String,
-            driveFileUrl = data["driveFileUrl"] as? String,
+            fileUri = effectiveUrl,
+            driveFileId = rawDriveId,
+            driveFileUrl = effectiveUrl,
             fileName = data["fileName"] as? String,
             fileSizeFormatted = data["fileSizeFormatted"] as? String,
             fileMimeType = data["fileMimeType"] as? String,
@@ -662,7 +673,21 @@ class RemoteResourceDataSourceImpl(
     private fun mapJsonToResource(json: JSONObject): ResourceItem? {
         val id = json.optString("id", "")
         if (id.isBlank()) return null
-        val fileUrl = json.optString("driveFileUrl", json.optString("fileUri", json.optString("previewUrl", null)))
+        val rawDriveUrl = json.optString("driveFileUrl", "")
+        val rawFileUri = json.optString("fileUri", "")
+        val rawPreviewUrl = json.optString("previewUrl", "")
+        var driveId = json.optString("driveFileId", "").takeIf { it.isNotBlank() }
+        if (driveId.isNullOrBlank()) {
+            driveId = com.example.util.DocumentViewerUtil.extractDriveFileId(rawDriveUrl.ifBlank { rawFileUri.ifBlank { rawPreviewUrl } })
+        }
+        val fileUrl = rawDriveUrl.ifBlank {
+            rawFileUri.ifBlank {
+                rawPreviewUrl.ifBlank {
+                    driveId?.let { "https://drive.google.com/file/d/$it/view?usp=sharing" } ?: ""
+                }
+            }
+        }.takeIf { it.isNotBlank() }
+
         return ResourceItem(
             id = if (id.startsWith("res_")) id else "res_$id",
             title = json.optString("title", "Academic Resource"),
@@ -678,7 +703,7 @@ class RemoteResourceDataSourceImpl(
             }.getOrDefault(ResourceType.NOTES),
             examYear = json.optString("examYear", null),
             fileUri = fileUrl,
-            driveFileId = json.optString("driveFileId", null),
+            driveFileId = driveId,
             driveFileUrl = fileUrl,
             fileName = json.optString("fileName", "Document.pdf"),
             fileSizeFormatted = json.optString("fileSizeFormatted", "PDF Document"),
@@ -696,6 +721,16 @@ class RemoteResourceDataSourceImpl(
         val data = doc.data ?: return null
         val submittedTime = (data["submittedTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
         val defaultExpires = submittedTime + (3 * 24 * 60 * 60 * 1000L)
+        val rawFileUri = data["fileUri"] as? String
+        val rawDriveUrl = data["driveFileUrl"] as? String
+        var rawDriveId = data["driveFileId"] as? String
+        if (rawDriveId.isNullOrBlank()) {
+            rawDriveId = com.example.util.DocumentViewerUtil.extractDriveFileId(rawDriveUrl ?: rawFileUri)
+        }
+        val effectiveUrl = rawDriveUrl?.takeIf { it.isNotBlank() }
+            ?: (if (rawFileUri?.startsWith("http") == true) rawFileUri else null)
+            ?: rawDriveId?.let { "https://drive.google.com/file/d/$it/view?usp=sharing" }
+            ?: rawFileUri
 
         return Submission(
             id = doc.id,
@@ -712,9 +747,9 @@ class RemoteResourceDataSourceImpl(
                 ResourceType.valueOf(data["resourceType"] as? String ?: "NOTES")
             }.getOrDefault(ResourceType.NOTES),
             examYear = data["examYear"] as? String,
-            fileUri = data["fileUri"] as? String,
-            driveFileId = data["driveFileId"] as? String,
-            driveFileUrl = data["driveFileUrl"] as? String,
+            fileUri = effectiveUrl,
+            driveFileId = rawDriveId,
+            driveFileUrl = effectiveUrl,
             fileName = data["fileName"] as? String,
             fileSizeFormatted = data["fileSizeFormatted"] as? String,
             fileMimeType = data["fileMimeType"] as? String,
@@ -736,7 +771,20 @@ class RemoteResourceDataSourceImpl(
         if (id.isBlank()) return null
         val submittedTime = json.optLong("submittedTimestamp", System.currentTimeMillis())
         val defaultExpires = submittedTime + (3 * 24 * 60 * 60 * 1000L)
-        val fileUrl = json.optString("driveFileUrl", json.optString("fileUri", json.optString("previewUrl", null)))
+        val rawDriveUrl = json.optString("driveFileUrl", "")
+        val rawFileUri = json.optString("fileUri", "")
+        val rawPreviewUrl = json.optString("previewUrl", "")
+        var driveId = json.optString("driveFileId", "").takeIf { it.isNotBlank() }
+        if (driveId.isNullOrBlank()) {
+            driveId = com.example.util.DocumentViewerUtil.extractDriveFileId(rawDriveUrl.ifBlank { rawFileUri.ifBlank { rawPreviewUrl } })
+        }
+        val fileUrl = rawDriveUrl.ifBlank {
+            rawFileUri.ifBlank {
+                rawPreviewUrl.ifBlank {
+                    driveId?.let { "https://drive.google.com/file/d/$it/view?usp=sharing" } ?: ""
+                }
+            }
+        }.takeIf { it.isNotBlank() }
 
         return Submission(
             id = id,
@@ -754,7 +802,7 @@ class RemoteResourceDataSourceImpl(
             }.getOrDefault(ResourceType.NOTES),
             examYear = json.optString("examYear", null),
             fileUri = fileUrl,
-            driveFileId = json.optString("driveFileId", null),
+            driveFileId = driveId,
             driveFileUrl = fileUrl,
             fileName = json.optString("fileName", "Document.pdf"),
             fileSizeFormatted = json.optString("fileSizeFormatted", "Document"),

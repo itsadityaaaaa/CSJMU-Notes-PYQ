@@ -833,15 +833,7 @@ fun ModerationReviewBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        if (!targetPreviewUrl.isNullOrBlank()) {
-                            runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetPreviewUrl))
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            }.onFailure {
-                                Toast.makeText(context, "Cannot open PDF preview", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                        com.example.util.DocumentViewerUtil.openSubmissionDocument(context, submission)
                     }
             ) {
                 Row(
@@ -868,24 +860,16 @@ fun ModerationReviewBottomSheet(
                             color = NaturalTextSecondary
                         )
                     }
-                    if (!targetPreviewUrl.isNullOrBlank()) {
-                        IconButton(
-                            onClick = {
-                                runCatching {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetPreviewUrl))
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    context.startActivity(intent)
-                                }.onFailure {
-                                    Toast.makeText(context, "Cannot open PDF preview", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.OpenInNew,
-                                contentDescription = "Preview PDF",
-                                tint = AcademicNavyPrimary
-                            )
+                    IconButton(
+                        onClick = {
+                            com.example.util.DocumentViewerUtil.openSubmissionDocument(context, submission)
                         }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = "Preview PDF",
+                            tint = AcademicNavyPrimary
+                        )
                     }
                 }
             }

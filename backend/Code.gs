@@ -1,14 +1,14 @@
 /**
  * CSJMU Notes & PYQ - Google Apps Script Backend
  * 
- * Free Google Drive Storage & Document Approval API
- * Keeps Firebase on the 100% Free Spark Plan (No Firebase Storage, No Cloud Functions required)
+ * Free Google Drive Storage & Document Moderation API
+ * 100% Free Tier Compliant (No Firebase Storage, No Cloud Functions required)
  * 
  * Google Drive Folder Structure:
  * NotesApp/
  *    ├── Pending/        (Uploaded documents waiting for admin moderation)
  *    ├── Approved/       (Published documents accessible to students)
- *    └── metadata.json   (Cloud record of all submissions and approved resources)
+ *    └── metadata.json   (Single canonical cloud record of all submissions and approved resources)
  */
 
 const ROOT_FOLDER_NAME = "NotesApp";
@@ -18,8 +18,16 @@ const METADATA_FILE_NAME = "metadata.json";
 
 /**
  * Handle incoming POST requests from the Android Application.
+ * Protected with LockService to prevent concurrent execution race conditions.
  */
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000); // Wait up to 30s for lock
+  } catch (lockErr) {
+    return createJsonResponse({ success: false, error: "Server busy. Please retry shortly." }, 503);
+  }
+
   try {
     if (!e || !e.postData || !e.postData.contents) {
       return createJsonResponse({ success: false, error: "Missing request payload" }, 400);
@@ -41,6 +49,10 @@ function doPost(e) {
       case "cleanupExpired":
         return handleCleanupExpired();
 
+      case "consolidate":
+      case "consolidateMetadata":
+        return handleConsolidateMetadata();
+
       case "getPending":
       case "getPendingSubmissions":
         return handleGetPendingSubmissions();
@@ -58,6 +70,10 @@ function doPost(e) {
     }
   } catch (err) {
     return createJsonResponse({ success: false, error: err.toString() }, 500);
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (e) {}
   }
 }
 
@@ -76,6 +92,9 @@ function doGet(e) {
     if (action === "getAll" || action === "getAllSubmissions") {
       return handleGetAllSubmissions();
     }
+    if (action === "consolidate" || action === "consolidateMetadata") {
+      return handleConsolidateMetadata();
+    }
 
     return createJsonResponse({
       status: "online",
@@ -88,8 +107,8 @@ function doGet(e) {
 }
 
 /**
- * 1. Uploads a user PDF to NotesApp/Pending/ folder in Google Drive.
- * Also stores the submission record into NotesApp/metadata.json.
+ * 1. Uploads a user PDF/Image to NotesApp/Pending/ folder in Google Drive.
+ * Stores the submission record into the single canonical NotesApp/metadata.json.
  */
 function handleUploadPending(data) {
   const fileName = data.fileName || "Note_" + new Date().getTime() + ".pdf";
@@ -120,7 +139,7 @@ function handleUploadPending(data) {
   const now = new Date().getTime();
   const expiresAt = now + (3 * 24 * 60 * 60 * 1000); // 3-day expiration
 
-  // Persist submission record in NotesApp/metadata.json
+  // Persist submission record in canonical metadata.json
   const submissionRecord = {
     id: data.submissionId || ("sub_" + Utilities.getUuid()),
     title: data.title || fileName,
@@ -279,7 +298,6 @@ function handleRejectDocument(data) {
 
 /**
  * 4. Automatically deletes pending files older than 3 days.
- * Daily Time-Driven Trigger can run this automatically.
  */
 function handleCleanupExpired() {
   const pendingFolder = getOrCreateSubFolder(PENDING_FOLDER_NAME);
@@ -362,32 +380,172 @@ function handleGetAllSubmissions() {
   });
 }
 
-// ==================== Storage Helpers ====================
+/**
+ * 8. Manually or automatically consolidate metadata:
+ * Searches for all metadata.json files in NotesApp, merges all submissions into
+ * one canonical file, deletes empty "[]" duplicates, and saves the file ID.
+ */
+function handleConsolidateMetadata() {
+  const result = consolidateAndCleanMetadata();
+  return createJsonResponse({
+    success: true,
+    message: "Metadata consolidated successfully",
+    canonicalFileId: result.fileId,
+    totalRecords: result.records.length,
+    deletedEmptyDuplicates: result.trashedCount,
+    records: result.records
+  });
+}
+
+// ==================== Atomic Storage Helpers ====================
 
 function getOrCreateRootFolder() {
-  const rootIterator = DriveApp.getFoldersByName(ROOT_FOLDER_NAME);
-  if (rootIterator.hasNext()) {
-    return rootIterator.next();
+  const props = PropertiesService.getScriptProperties();
+  const cachedRootId = props.getProperty("ROOT_FOLDER_ID");
+  if (cachedRootId) {
+    try {
+      const folder = DriveApp.getFolderById(cachedRootId);
+      if (folder && !folder.isTrashed()) {
+        return folder;
+      }
+    } catch (e) {}
   }
-  return DriveApp.createFolder(ROOT_FOLDER_NAME);
+
+  const rootIterator = DriveApp.getFoldersByName(ROOT_FOLDER_NAME);
+  let rootFolder = null;
+  while (rootIterator.hasNext()) {
+    const f = rootIterator.next();
+    if (!f.isTrashed()) {
+      rootFolder = f;
+      break;
+    }
+  }
+
+  if (!rootFolder) {
+    rootFolder = DriveApp.createFolder(ROOT_FOLDER_NAME);
+  }
+
+  props.setProperty("ROOT_FOLDER_ID", rootFolder.getId());
+  return rootFolder;
 }
 
 function getOrCreateSubFolder(subFolderName) {
+  const props = PropertiesService.getScriptProperties();
+  const propKey = "SUBFOLDER_ID_" + subFolderName;
+  const cachedSubId = props.getProperty(propKey);
+  if (cachedSubId) {
+    try {
+      const folder = DriveApp.getFolderById(cachedSubId);
+      if (folder && !folder.isTrashed()) {
+        return folder;
+      }
+    } catch (e) {}
+  }
+
   const rootFolder = getOrCreateRootFolder();
   const subIterator = rootFolder.getFoldersByName(subFolderName);
-  if (subIterator.hasNext()) {
-    return subIterator.next();
+  let subFolder = null;
+  while (subIterator.hasNext()) {
+    const f = subIterator.next();
+    if (!f.isTrashed()) {
+      subFolder = f;
+      break;
+    }
   }
-  return rootFolder.createFolder(subFolderName);
+
+  if (!subFolder) {
+    subFolder = rootFolder.createFolder(subFolderName);
+  }
+
+  props.setProperty(propKey, subFolder.getId());
+  return subFolder;
 }
 
+/**
+ * Atomic metadata file accessor that prevents duplicate files and consolidates existing ones.
+ * Resolves the issue where 3 metadata files are created with two empty "[]".
+ */
 function getMetadataFile() {
+  const props = PropertiesService.getScriptProperties();
+  const cachedId = props.getProperty("METADATA_FILE_ID");
+
+  if (cachedId) {
+    try {
+      const file = DriveApp.getFileById(cachedId);
+      if (file && !file.isTrashed()) {
+        return file;
+      }
+    } catch (e) {
+      // Stale or invalid cached ID
+    }
+  }
+
+  // Find, consolidate, and clean up all metadata.json files in the root folder
+  const consolidated = consolidateAndCleanMetadata();
+  return DriveApp.getFileById(consolidated.fileId);
+}
+
+/**
+ * Finds all files named metadata.json in NotesApp, merges all items deduplicated by id,
+ * trashes all empty "[]" or duplicate files, and caches the single canonical file ID.
+ */
+function consolidateAndCleanMetadata() {
+  const props = PropertiesService.getScriptProperties();
   const root = getOrCreateRootFolder();
   const files = root.getFilesByName(METADATA_FILE_NAME);
-  if (files.hasNext()) {
-    return files.next();
+
+  const allFoundFiles = [];
+  const mergedMap = {};
+
+  while (files.hasNext()) {
+    const f = files.next();
+    if (f.isTrashed()) continue;
+    allFoundFiles.push(f);
+
+    try {
+      const content = f.getBlob().getDataAsString();
+      const parsed = JSON.parse(content || "[]");
+      if (Array.isArray(parsed)) {
+        for (let i = 0; i < parsed.length; i++) {
+          const item = parsed[i];
+          const key = item.id || item.driveFileId;
+          if (key && !mergedMap[key]) {
+            mergedMap[key] = item;
+          }
+        }
+      }
+    } catch (err) {}
   }
-  return root.createFile(METADATA_FILE_NAME, "[]", MimeType.PLAIN_TEXT);
+
+  const mergedList = Object.keys(mergedMap).map(function(k) { return mergedMap[k]; });
+  let canonicalFile = null;
+  let trashedCount = 0;
+
+  if (allFoundFiles.length === 0) {
+    // No file exists yet, create exactly one
+    canonicalFile = root.createFile(METADATA_FILE_NAME, "[]", MimeType.PLAIN_TEXT);
+    canonicalFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } else {
+    // Keep the first file as canonical, trash all other duplicates
+    canonicalFile = allFoundFiles[0];
+    canonicalFile.setContent(JSON.stringify(mergedList, null, 2));
+    canonicalFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    for (let i = 1; i < allFoundFiles.length; i++) {
+      try {
+        allFoundFiles[i].setTrashed(true);
+        trashedCount++;
+      } catch (e) {}
+    }
+  }
+
+  props.setProperty("METADATA_FILE_ID", canonicalFile.getId());
+
+  return {
+    fileId: canonicalFile.getId(),
+    records: mergedList,
+    trashedCount: trashedCount
+  };
 }
 
 function loadAllMetadata() {
@@ -406,12 +564,11 @@ function saveAllMetadata(list) {
     const file = getMetadataFile();
     file.setContent(JSON.stringify(list, null, 2));
   } catch (e) {
-    // Retry once if file handle was stale
-    const root = getOrCreateRootFolder();
-    const files = root.getFilesByName(METADATA_FILE_NAME);
-    if (files.hasNext()) {
-      files.next().setContent(JSON.stringify(list, null, 2));
-    }
+    // Fallback: clear stale cached ID and consolidate
+    const props = PropertiesService.getScriptProperties();
+    props.deleteProperty("METADATA_FILE_ID");
+    const file = getMetadataFile();
+    file.setContent(JSON.stringify(list, null, 2));
   }
 }
 

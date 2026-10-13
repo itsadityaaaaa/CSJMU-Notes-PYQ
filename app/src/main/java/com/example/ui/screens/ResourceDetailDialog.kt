@@ -138,59 +138,86 @@ fun ResourceDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Attached document preview card
+            // Attached document preview card & inline visual thumbnail
+            val driveFileId = resource.driveFileId ?: com.example.util.DocumentViewerUtil.extractDriveFileId(resource.driveFileUrl ?: resource.fileUri)
+            val isImage = (resource.fileMimeType?.startsWith("image/") == true) ||
+                    (resource.fileName?.lowercase()?.let { it.endsWith(".jpg") || it.endsWith(".jpeg") || it.endsWith(".png") } == true)
+            val directImageUrl = com.example.util.DocumentViewerUtil.getDirectImageUrl(resource.driveFileUrl ?: resource.fileUri, driveFileId)
+
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(HeritageWinePrimary),
-                        contentAlignment = Alignment.Center
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = null,
-                            tint = androidx.compose.ui.graphics.Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(HeritageWinePrimary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                tint = androidx.compose.ui.graphics.Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = resource.fileName ?: "Academic_Resource.pdf",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "${resource.fileSizeFormatted ?: "Cloud Document"} • Tap to open",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = resource.fileName ?: "Academic_Resource.pdf",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            maxLines = 1
-                        )
-                        Text(
-                            text = resource.fileSizeFormatted ?: "Ready to view",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    // If it's an uploaded image note, render high-res thumbnail preview
+                    if (isImage && !directImageUrl.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = directImageUrl,
+                                contentDescription = resource.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
+            // Action Buttons: Open/Preview, Download to Device, and Share
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
                     onClick = {
-                        openDocument(context, resource)
+                        com.example.util.DocumentViewerUtil.openResourceDocument(context, resource)
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -198,9 +225,23 @@ fun ResourceDetailBottomSheet(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = HeritageWinePrimary)
                 ) {
-                    Icon(imageVector = Icons.Default.Download, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("View / Download")
+                    Icon(imageVector = Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Open / View", maxLines = 1)
+                }
+
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = {
+                        com.example.util.DocumentViewerUtil.downloadResourceDocument(context, resource)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("download_document_button"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Download", maxLines = 1)
                 }
 
                 OutlinedButton(
@@ -238,26 +279,20 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-private fun openDocument(context: Context, resource: ResourceItem) {
-    if (resource.fileUri != null) {
-        try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(Uri.parse(resource.fileUri), resource.fileMimeType ?: "application/pdf")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Opening document: ${resource.title}", Toast.LENGTH_SHORT).show()
-        }
-    } else {
-        Toast.makeText(context, "Document ready: ${resource.title} (${resource.subjectName})", Toast.LENGTH_SHORT).show()
-    }
-}
-
 private fun shareResource(context: Context, resource: ResourceItem) {
+    val cloudLink = com.example.util.DocumentViewerUtil.getPreviewUrl(resource.driveFileUrl ?: resource.fileUri, resource.driveFileId)
     val sendIntent = Intent().apply {
         action = Intent.ACTION_SEND
-        putExtra(Intent.EXTRA_TEXT, "CSJMU Notes & PYQ:\n${resource.title}\nSubject: ${resource.subjectName}\nCourse: ${resource.courseId} (Sem ${resource.semester})")
+        val shareText = buildString {
+            append("CSJMU Notes & PYQ:\n")
+            append("${resource.title}\n")
+            append("Subject: ${resource.subjectName}\n")
+            append("Course: ${resource.courseId} (Sem ${resource.semester})\n")
+            if (!cloudLink.isNullOrBlank()) {
+                append("\nView Document:\n$cloudLink")
+            }
+        }
+        putExtra(Intent.EXTRA_TEXT, shareText)
         type = "text/plain"
     }
     context.startActivity(Intent.createChooser(sendIntent, "Share CSJMU Resource"))

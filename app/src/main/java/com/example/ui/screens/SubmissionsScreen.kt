@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Person
@@ -236,6 +237,7 @@ fun StudentSubmissionCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            val context = androidx.compose.ui.platform.LocalContext.current
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,11 +249,25 @@ fun StudentSubmissionCard(
                     color = MaterialTheme.colorScheme.outline
                 )
 
-                Text(
-                    text = submission.fileName ?: "Document",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.outline
-                )
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        com.example.util.DocumentViewerUtil.openSubmissionDocument(context, submission)
+                    },
+                    modifier = Modifier.height(34.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "View File",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             }
         }
     }
