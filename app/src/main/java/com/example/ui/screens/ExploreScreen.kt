@@ -53,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.repository.AcademicCatalog
@@ -162,7 +163,8 @@ fun ExploreScreen(
                                 Text(
                                     text = filterState.selectedCollege.shortCode,
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select College")
@@ -222,7 +224,8 @@ fun ExploreScreen(
                                 Text(
                                     text = filterState.selectedCourse.name,
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select Course")
@@ -275,65 +278,71 @@ fun ExploreScreen(
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.selectYear(year) },
-                            label = { Text(text = year.label) },
+                            label = {
+                                Text(
+                                    text = year.label,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = HeritageWinePrimary,
-                                selectedLabelColor = androidx.compose.ui.graphics.Color.White
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             modifier = Modifier.testTag("year_chip_${year.yearNumber}")
-                        )
-                    }
-                }
-
-                // Semester Sub-chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterChip(
-                        selected = filterState.selectedSemester == null,
-                        onClick = { viewModel.selectSemester(null) },
-                        label = { Text("All Semesters") }
-                    )
-
-                    filterState.selectedYear.semesters.forEach { sem ->
-                        FilterChip(
-                            selected = filterState.selectedSemester == sem,
-                            onClick = { viewModel.selectSemester(sem) },
-                            label = { Text("Semester $sem") },
-                            modifier = Modifier.testTag("sem_chip_$sem")
                         )
                     }
                 }
             }
         }
 
-        // Search Bar & Resource Type Tabs
-        Column(
+        // Reduced Compact One-Line Search Bar
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
             OutlinedTextField(
                 value = filterState.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Search by topic, unit, or subject name...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                placeholder = {
+                    Text(
+                        text = "Search notes, topics or PYQs...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
                 trailingIcon = {
                     if (filterState.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        IconButton(
+                            onClick = { viewModel.setSearchQuery("") },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Clear",
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
+                textStyle = MaterialTheme.typography.bodyMedium,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = HeritageWinePrimary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -348,6 +357,8 @@ fun ExploreScreen(
         ScrollableTabRow(
             selectedTabIndex = if (selectedTabIndex >= 0) selectedTabIndex else 0,
             edgePadding = 16.dp,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
             modifier = Modifier.fillMaxWidth()
         ) {
             tabTypes.forEachIndexed { index, type ->
@@ -357,7 +368,9 @@ fun ExploreScreen(
                     text = {
                         Text(
                             text = type?.displayName ?: "All Resources",
-                            fontWeight = if (filterState.selectedResourceType == type) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (filterState.selectedResourceType == type) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     },
                     modifier = Modifier.testTag("tab_${type?.name?.lowercase() ?: "all"}")

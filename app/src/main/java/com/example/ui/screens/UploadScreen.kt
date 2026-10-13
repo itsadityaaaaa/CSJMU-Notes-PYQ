@@ -230,7 +230,7 @@ fun UploadScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("upload_college_select"),
-                colors = CardDefaults.outlinedCardColors(containerColor = NaturalCardSurface)
+                colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Row(
                     modifier = Modifier
@@ -284,7 +284,7 @@ fun UploadScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("upload_course_select"),
-                colors = CardDefaults.outlinedCardColors(containerColor = NaturalCardSurface)
+                colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Row(
                     modifier = Modifier
@@ -514,7 +514,7 @@ fun UploadScreen(
         OutlinedCard(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.outlinedCardColors(containerColor = NaturalCardSurface)
+            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(

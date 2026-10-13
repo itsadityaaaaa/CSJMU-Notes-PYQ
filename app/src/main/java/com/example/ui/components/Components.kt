@@ -74,10 +74,8 @@ import com.example.ui.theme.WarmSurfaceVariant
 @Composable
 fun AcademicHeader(
     modifier: Modifier = Modifier,
-    userDisplayName: String? = null,
     isDarkTheme: Boolean = false,
     onToggleTheme: (() -> Unit)? = null,
-    onAuthClick: (() -> Unit)? = null,
     onAdminClick: (() -> Unit)? = null
 ) {
     Surface(
@@ -87,135 +85,98 @@ fun AcademicHeader(
         color = MaterialTheme.colorScheme.primary,
         tonalElevation = 4.dp
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
+                    Icon(
+                        imageVector = Icons.Default.School,
+                        contentDescription = "CSJMU Crest",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = "CSJMU Notes & PYQ",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.2.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "University Institute of Engineering & Technology",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Sleek Theme Toggle Button
+                if (onToggleTheme != null) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f),
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
+                            .clickable { onToggleTheme() }
+                            .testTag("theme_toggle_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.School,
-                            contentDescription = "CSJMU Crest",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Column {
-                        Text(
-                            text = "CSJMU Notes & PYQ",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.3.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Text(
-                            text = "Academic Resource Repository",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = "Switch Theme",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Theme Switch Button (Black & White Light / Dark toggle)
-                    if (onToggleTheme != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onToggleTheme() }
-                                .testTag("theme_toggle_button")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = "Switch Theme",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isDarkTheme) "Light" else "Dark",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
-                        }
-                    }
-
-                    if (onAuthClick != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onAuthClick() }
-                                .testTag("google_auth_header_button")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = userDisplayName?.take(10) ?: "Sign In",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
-                        }
-                    }
-
-                    if (onAdminClick != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onAdminClick() }
-                                .testTag("admin_header_badge")
-                        ) {
-                            Text(
-                                text = "Admin",
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
+                if (onAdminClick != null) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onAdminClick() }
+                            .testTag("admin_header_badge")
+                    ) {
+                        Text(
+                            text = "Admin",
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -228,17 +189,17 @@ fun ResourceTypeBadge(
     type: ResourceType,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, textColor, icon) = when (type) {
-        ResourceType.NOTES -> Triple(HeritageWineContainer, HeritageOnWineContainer, Icons.Default.MenuBook)
-        ResourceType.PYQ -> Triple(HeritageBrassContainer, HeritageOnBrassContainer, Icons.Default.Assignment)
-        ResourceType.SYLLABUS -> Triple(HeritageSageContainer, HeritageOnSageContainer, Icons.Default.Description)
-        ResourceType.FORMULA_SHEET -> Triple(WarmSurfaceVariant, Color(0xFF44403C), Icons.Default.Description)
+    val icon = when (type) {
+        ResourceType.NOTES -> Icons.Default.MenuBook
+        ResourceType.PYQ -> Icons.Default.Assignment
+        ResourceType.SYLLABUS -> Icons.Default.Description
+        ResourceType.FORMULA_SHEET -> Icons.Default.Description
     }
 
     Surface(
         modifier = modifier.testTag("badge_${type.name.lowercase()}"),
         shape = RoundedCornerShape(6.dp),
-        color = bgColor,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = CardDefaults.outlinedCardBorder()
     ) {
         Row(
@@ -248,14 +209,16 @@ fun ResourceTypeBadge(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = textColor,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = type.badgeLabel,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = textColor
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }
@@ -266,16 +229,16 @@ fun StatusBadge(
     status: ApprovalStatus,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, textColor, icon) = when (status) {
-        ApprovalStatus.PENDING -> Triple(EditorialWarningContainer, EditorialWarning, Icons.Default.HourglassEmpty)
-        ApprovalStatus.APPROVED -> Triple(EditorialSuccessContainer, EditorialSuccess, Icons.Default.CheckCircle)
-        ApprovalStatus.REJECTED -> Triple(EditorialErrorContainer, EditorialError, Icons.Default.Error)
+    val (statusColor, icon) = when (status) {
+        ApprovalStatus.PENDING -> Pair(EditorialWarning, Icons.Default.HourglassEmpty)
+        ApprovalStatus.APPROVED -> Pair(EditorialSuccess, Icons.Default.CheckCircle)
+        ApprovalStatus.REJECTED -> Pair(EditorialError, Icons.Default.Error)
     }
 
     Surface(
         modifier = modifier.testTag("status_${status.name.lowercase()}"),
         shape = RoundedCornerShape(6.dp),
-        color = bgColor,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = CardDefaults.outlinedCardBorder()
     ) {
         Row(
@@ -285,14 +248,16 @@ fun StatusBadge(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = textColor,
+                tint = statusColor,
                 modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = status.displayName,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = textColor
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }
@@ -331,13 +296,15 @@ fun ResourceCard(
                 if (resource.examYear != null) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = WarmSurfaceVariant
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
                             text = resource.examYear,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -382,7 +349,10 @@ fun ResourceCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Person,
                         contentDescription = null,
@@ -393,7 +363,9 @@ fun ResourceCard(
                     Text(
                         text = resource.contributorName,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -401,7 +373,9 @@ fun ResourceCard(
                     Text(
                         text = resource.fileSizeFormatted,
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = HeritageWinePrimary
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
@@ -413,14 +387,17 @@ fun ResourceCard(
 fun TagChip(label: String) {
     Surface(
         shape = RoundedCornerShape(4.dp),
-        color = WarmSurfaceVariant,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = CardDefaults.outlinedCardBorder()
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false
         )
     }
 }

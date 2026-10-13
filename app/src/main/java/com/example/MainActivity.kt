@@ -137,8 +137,6 @@ class MainActivity : ComponentActivity() {
 
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 MainApp(
-                    activity = this@MainActivity,
-                    authManager = authManager,
                     resourceViewModel = resourceViewModel,
                     uploadViewModel = uploadViewModel,
                     adminViewModel = adminViewModel,
@@ -152,8 +150,6 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainApp(
-    activity: ComponentActivity,
-    authManager: FirebaseAuthManager,
     resourceViewModel: ResourceViewModel,
     uploadViewModel: UploadViewModel,
     adminViewModel: AdminViewModel,
@@ -162,20 +158,8 @@ fun MainApp(
 ) {
     var currentTab by remember { mutableStateOf(NavigationTab.EXPLORE) }
     val allSubmissions by adminViewModel.allSubmissions.collectAsState()
+    val adminUiState by adminViewModel.uiState.collectAsState()
     val pendingCount = allSubmissions.count { it.status == com.example.domain.model.ApprovalStatus.PENDING }
-    val currentUser by authManager.currentUser.collectAsState()
-
-    var showAuthDialog by remember { mutableStateOf(false) }
-
-    // Pre-fill student info in UploadScreen if logged in
-    LaunchedEffect(currentUser) {
-        currentUser?.let { user ->
-            val name = user.displayName ?: ""
-            val email = user.email ?: ""
-            if (name.isNotBlank()) uploadViewModel.updateContributorName(name)
-            if (email.isNotBlank()) uploadViewModel.updateContributorEmail(email)
-        }
-    }
 
     // Android back navigation: Return to Explore if currently on another tab
     BackHandler(enabled = currentTab != NavigationTab.EXPLORE) {
@@ -188,10 +172,8 @@ fun MainApp(
             .testTag("csjmu_main_scaffold"),
         topBar = {
             AcademicHeader(
-                userDisplayName = currentUser?.displayName ?: currentUser?.email,
                 isDarkTheme = isDarkTheme,
                 onToggleTheme = onToggleTheme,
-                onAuthClick = { showAuthDialog = true },
                 onAdminClick = { currentTab = NavigationTab.ADMIN }
             )
         },
@@ -206,7 +188,8 @@ fun MainApp(
                         selected = isSelected,
                         onClick = { currentTab = tab },
                         icon = {
-                            if (tab == NavigationTab.ADMIN && pendingCount > 0) {
+                            // Only show badge notification if admin is logged in
+                            if (tab == NavigationTab.ADMIN && adminUiState.isAdminUnlocked && pendingCount > 0) {
                                 BadgedBox(badge = { Badge { Text(pendingCount.toString()) } }) {
                                     Icon(
                                         imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
@@ -271,90 +254,5 @@ fun MainApp(
                 }
             }
         }
-    }
-
-    // Google Sign-In & User Account Profile Dialog
-    if (showAuthDialog) {
-        AlertDialog(
-            onDismissRequest = { showAuthDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp),
-                    tint = HeritageWinePrimary
-                )
-            },
-            title = {
-                Text(
-                    text = if (currentUser != null) "Student / Contributor Account" else "Sign In with Google",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            },
-            text = {
-                Column {
-                    if (currentUser != null) {
-                        Text(text = "Signed in as: ${currentUser?.displayName ?: "CSJMU Student"}")
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = currentUser?.email ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Your uploads are linked to this Google account for verification and cloud synchronization.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    } else {
-                        Text(
-                            text = "Connect your Google account via Jetpack Credential Manager to sync your notes to the Firebase Cloud Database and track moderation approvals across devices."
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                if (currentUser == null) {
-                    Button(
-                        onClick = {
-                            showAuthDialog = false
-                            authManager.signInWithGoogle(
-                                activity = activity,
-                                onSuccess = { user ->
-                                    Toast.makeText(activity, "Signed in as ${user.displayName}", Toast.LENGTH_SHORT).show()
-                                },
-                                onError = { errorMsg ->
-                                    Toast.makeText(activity, "Sign in failed: $errorMsg", Toast.LENGTH_LONG).show()
-                                }
-                            )
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = HeritageWinePrimary),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Sign In with Google")
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = {
-                            showAuthDialog = false
-                            authManager.signOut {
-                                Toast.makeText(activity, "Signed out", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Sign Out")
-                    }
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { showAuthDialog = false },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Close")
-                }
-            }
-        )
     }
 }

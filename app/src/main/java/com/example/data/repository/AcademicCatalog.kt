@@ -80,6 +80,30 @@ object AcademicCatalog {
             totalYears = 4,
             department = "Engineering"
         ),
+        Course(
+            id = "btech_che",
+            collegeId = "csjmu_uiet",
+            name = "B.Tech - Chemical Engineering",
+            code = "B.TECH CHE",
+            totalYears = 4,
+            department = "Engineering"
+        ),
+        Course(
+            id = "btech_ai",
+            collegeId = "csjmu_uiet",
+            name = "B.Tech - Artificial Intelligence (AI)",
+            code = "B.TECH AI",
+            totalYears = 4,
+            department = "Engineering"
+        ),
+        Course(
+            id = "btech_msme",
+            collegeId = "csjmu_uiet",
+            name = "B.Tech - Materials Science & Metallurgical Engineering (MSME)",
+            code = "B.TECH MSME",
+            totalYears = 4,
+            department = "Engineering"
+        ),
         // Computer Applications
         Course(
             id = "bca",
@@ -195,6 +219,44 @@ object AcademicCatalog {
         Subject("cse_s7_bigdata", "btech_cse", 4, 7, "BCS703", "Big Data Analytics"),
         Subject("cse_s8_iot", "btech_cse", 4, 8, "BCS801", "Internet of Things (IoT)"),
         Subject("cse_s8_dl", "btech_cse", 4, 8, "BCS802", "Deep Learning & Neural Networks"),
+
+        // B.Tech Chemical Engineering (CHE)
+        Subject("che_s1_chem", "btech_che", 1, 1, "BCH101", "Engineering Chemistry"),
+        Subject("che_s1_math", "btech_che", 1, 1, "BCH102", "Engineering Mathematics - I"),
+        Subject("che_s2_fm", "btech_che", 1, 2, "BCH201", "Fluid Flow Operations"),
+        Subject("che_s3_thermo", "btech_che", 2, 3, "BCH301", "Chemical Engineering Thermodynamics"),
+        Subject("che_s3_ht", "btech_che", 2, 3, "BCH302", "Heat Transfer Operations"),
+        Subject("che_s4_mt", "btech_che", 2, 4, "BCH401", "Mass Transfer Operations - I"),
+        Subject("che_s4_cre", "btech_che", 2, 4, "BCH402", "Chemical Reaction Engineering - I"),
+        Subject("che_s5_pci", "btech_che", 3, 5, "BCH501", "Process Instrumentation & Dynamics"),
+        Subject("che_s6_plant", "btech_che", 3, 6, "BCH601", "Plant Design & Economics"),
+        Subject("che_s7_petro", "btech_che", 4, 7, "BCH701", "Petroleum Refining & Petrochemicals"),
+        Subject("che_s8_safety", "btech_che", 4, 8, "BCH801", "Industrial Safety & Hazard Management"),
+
+        // B.Tech Artificial Intelligence (AI)
+        Subject("ai_s1_math", "btech_ai", 1, 1, "BAI101", "Discrete Math & Linear Algebra"),
+        Subject("ai_s1_py", "btech_ai", 1, 1, "BAI102", "Python for Data Science & AI"),
+        Subject("ai_s2_ds", "btech_ai", 1, 2, "BAI201", "Data Structures & Algorithms in AI"),
+        Subject("ai_s3_ai_intro", "btech_ai", 2, 3, "BAI301", "Foundations of Artificial Intelligence"),
+        Subject("ai_s3_stats", "btech_ai", 2, 3, "BAI302", "Probability & Applied Statistics"),
+        Subject("ai_s4_ml", "btech_ai", 2, 4, "BAI401", "Machine Learning Algorithms"),
+        Subject("ai_s5_dl", "btech_ai", 3, 5, "BAI501", "Deep Learning & Neural Networks"),
+        Subject("ai_s5_nlp", "btech_ai", 3, 5, "BAI502", "Natural Language Processing (NLP)"),
+        Subject("ai_s6_cv", "btech_ai", 3, 6, "BAI601", "Computer Vision & Image Analysis"),
+        Subject("ai_s7_reinforce", "btech_ai", 4, 7, "BAI701", "Reinforcement Learning & Robotics"),
+        Subject("ai_s8_ethics", "btech_ai", 4, 8, "BAI801", "AI Ethics, Governance & MLOps"),
+
+        // B.Tech Materials Science & Metallurgical Engineering (MSME)
+        Subject("msme_s1_mat", "btech_msme", 1, 1, "BMS101", "Introduction to Materials Science"),
+        Subject("msme_s1_chem", "btech_msme", 1, 1, "BMS102", "Applied Chemistry for Metallurgy"),
+        Subject("msme_s2_thermo", "btech_msme", 1, 2, "BMS201", "Metallurgical Thermodynamics"),
+        Subject("msme_s3_phys", "btech_msme", 2, 3, "BMS301", "Physical Metallurgy"),
+        Subject("msme_s3_phase", "btech_msme", 2, 3, "BMS302", "Phase Diagrams & Transformations"),
+        Subject("msme_s4_mech", "btech_msme", 2, 4, "BMS401", "Mechanical Metallurgy & Testing"),
+        Subject("msme_s5_iron", "btech_msme", 3, 5, "BMS501", "Iron & Steel Making Technology"),
+        Subject("msme_s6_char", "btech_msme", 3, 6, "BMS601", "Materials Characterization Techniques"),
+        Subject("msme_s7_corr", "btech_msme", 4, 7, "BMS701", "Corrosion Science & Protection"),
+        Subject("msme_s8_nano", "btech_msme", 4, 8, "BMS801", "Advanced Composites & Nanomaterials"),
 
         // BCA
         Subject("bca_s1_fit", "bca", 1, 1, "BCA101", "Fundamentals of Information Technology"),
