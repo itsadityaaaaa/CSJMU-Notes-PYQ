@@ -27,8 +27,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -50,6 +54,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -60,6 +66,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -87,6 +94,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.repository.AcademicCatalog
 import com.example.domain.model.ApprovalStatus
 import com.example.domain.model.ResourceType
 import com.example.domain.model.Submission
@@ -124,6 +132,7 @@ fun AdminScreen(
     val allSubmissions by viewModel.allSubmissions.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val context = LocalContext.current
+    var submissionToDelete by remember { mutableStateOf<Submission?>(null) }
 
     // Sync cloud queue when entering Admin screen
     LaunchedEffect(uiState.isAdminUnlocked) {
@@ -363,11 +372,85 @@ fun AdminScreen(
                         AdminSubmissionCard(
                             submission = submission,
                             onReviewClick = { viewModel.openReview(submission) },
-                            onEditClick = { viewModel.openEdit(submission) }
+                            onEditClick = { viewModel.openEdit(submission) },
+                            onDeleteClick = { submissionToDelete = submission }
                         )
                     }
                 }
             }
+        }
+
+        // Delete Confirmation Dialog for Admin
+        submissionToDelete?.let { sub ->
+            AlertDialog(
+                onDismissRequest = { submissionToDelete = null },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = EditorialError,
+                        modifier = Modifier.size(36.dp)
+                    )
+                },
+                title = {
+                    Text(
+                        text = "Delete Document from Drive?",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Are you sure you want to permanently delete this document?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = sub.title,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${sub.courseName} • Year ${sub.academicYear} • ${sub.subjectName}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "This will permanently trash the file in Google Drive and remove it from all student course catalogs.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialError
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val id = sub.id
+                            submissionToDelete = null
+                            viewModel.deleteSubmission(id)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = EditorialError)
+                    ) {
+                        Text("Delete from Drive")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { submissionToDelete = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
 
         // Moderation Sheet
@@ -381,11 +464,15 @@ fun AdminScreen(
                     viewModel.openEdit(submission)
                 },
                 onApprove = { notes -> viewModel.approveSubmission(submission, notes) },
-                onReject = { reason -> viewModel.rejectSubmission(submission.id, reason) }
+                onReject = { reason -> viewModel.rejectSubmission(submission.id, reason) },
+                onDeleteClick = {
+                    viewModel.closeReview()
+                    submissionToDelete = submission
+                }
             )
         }
 
-        // Full Admin Edit Submission Sheet (Can edit description and ALL other fields)
+        // Full Admin Edit Submission Sheet (Matches Upload specifications exactly)
         uiState.selectedSubmissionForEdit?.let { submissionToEdit ->
             AdminEditSubmissionBottomSheet(
                 submission = submissionToEdit,
@@ -393,6 +480,10 @@ fun AdminScreen(
                 onDismiss = { viewModel.closeEdit() },
                 onSaveEdits = { updated, approveNow, adminNotes ->
                     viewModel.saveEdits(updated, approveNow, adminNotes)
+                },
+                onDeleteClick = {
+                    viewModel.closeEdit()
+                    submissionToDelete = submissionToEdit
                 }
             )
         }
@@ -634,6 +725,7 @@ fun AdminSubmissionCard(
     submission: Submission,
     onReviewClick: () -> Unit,
     onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
@@ -713,7 +805,25 @@ fun AdminSubmissionCard(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Delete Button
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("delete_button_${submission.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Delete from Drive",
+                            tint = EditorialError,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
                     // Quick Edit Note Button
                     OutlinedButton(
                         onClick = onEditClick,
@@ -756,7 +866,8 @@ fun ModerationReviewBottomSheet(
     onDismiss: () -> Unit,
     onEditAllFields: () -> Unit,
     onApprove: (adminNotes: String) -> Unit,
-    onReject: (reason: String) -> Unit
+    onReject: (reason: String) -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -966,6 +1077,26 @@ fun ModerationReviewBottomSheet(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Delete Document Button
+            OutlinedButton(
+                onClick = onDeleteClick,
+                enabled = !isProcessing,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorialError),
+                border = ButtonDefaults.outlinedButtonBorder.copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(EditorialError)
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("admin_delete_document_button")
+            ) {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Delete Document from Google Drive")
+            }
         }
     }
 
@@ -1007,8 +1138,10 @@ fun ModerationReviewBottomSheet(
 }
 
 /**
- * Comprehensive Admin Edit Sheet: Allows the administrator to edit the description
- * and ALL other fields of the uploaded notes prior to or following approval.
+ * Comprehensive Admin Edit Sheet: Re-engineered to exactly match the Upload section structure.
+ * Features College Dropdown, Course Dropdown, 4-Year Dropdown Menu, Semester FilterChips,
+ * Subject Details (Name *, Code, Coverage), Material Type, File Preview in Drive,
+ * and allows deleting the document permanently from Google Drive and CSJMU catalog.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1016,21 +1149,44 @@ fun AdminEditSubmissionBottomSheet(
     submission: Submission,
     isProcessing: Boolean,
     onDismiss: () -> Unit,
-    onSaveEdits: (updated: Submission, approveNow: Boolean, adminNotes: String?) -> Unit
+    onSaveEdits: (updated: Submission, approveNow: Boolean, adminNotes: String?) -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
 
-    // Editable state variables
-    var title by remember { mutableStateOf(submission.title) }
-    var description by remember { mutableStateOf(submission.description) }
+    // Initialize college, course, year from the submission record
+    val initialCollege = AcademicCatalog.COLLEGES.find { it.id == submission.collegeId } ?: AcademicCatalog.COLLEGES.first()
+    var selectedCollege by remember { mutableStateOf(initialCollege) }
+
+    val availableCourses = AcademicCatalog.getCoursesForCollege(selectedCollege.id)
+    val initialCourse = availableCourses.find { it.id == submission.courseId || it.name.equals(submission.courseName, ignoreCase = true) }
+        ?: availableCourses.first()
+    var selectedCourse by remember { mutableStateOf(initialCourse) }
+
+    val availableYears = AcademicCatalog.getYearsForCourse(selectedCourse)
+    val initialYear = availableYears.find { it.yearNumber == submission.academicYear } ?: availableYears.first()
+    var selectedYear by remember { mutableStateOf(initialYear) }
+    var selectedSemester by remember { mutableIntStateOf(submission.semester) }
+
+    var showCollegeMenu by remember { mutableStateOf(false) }
+    var showCourseMenu by remember { mutableStateOf(false) }
+    var showYearMenu by remember { mutableStateOf(false) }
+
+    // Subject Details (matching upload section without separate title and description fields)
     var subjectName by remember { mutableStateOf(submission.subjectName) }
-    var courseName by remember { mutableStateOf(submission.courseName) }
-    var academicYear by remember { mutableIntStateOf(submission.academicYear) }
-    var semester by remember { mutableIntStateOf(submission.semester) }
+    var subjectCode by remember { mutableStateOf("") }
+    var topicUnitCoverage by remember { mutableStateOf("") }
+
+    // Resource Type
     var resourceType by remember { mutableStateOf(submission.resourceType) }
     var examYear by remember { mutableStateOf(submission.examYear ?: "") }
+
+    // Contributor Identity
     var contributorName by remember { mutableStateOf(submission.contributorName) }
     var contributorEmail by remember { mutableStateOf(submission.contributorEmail ?: "") }
+
+    // Admin Review Notes
     var adminFeedback by remember { mutableStateOf(submission.adminFeedback ?: "") }
 
     ModalBottomSheet(
@@ -1063,7 +1219,7 @@ fun AdminEditSubmissionBottomSheet(
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Edit Note Details & Fields",
+                        text = "Admin Edit & Moderation",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = NaturalTextPrimary
                     )
@@ -1075,107 +1231,280 @@ fun AdminEditSubmissionBottomSheet(
             }
 
             Text(
-                text = "Modify description, syllabus coverage, title, or curriculum information as an admin.",
+                text = "Modify curriculum metadata, subject details, or delete from Google Drive. Matches upload specifications.",
                 style = MaterialTheme.typography.bodySmall,
                 color = NaturalTextSecondary,
                 modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
             )
 
-            // 1. Note Title
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Note Title") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("edit_title_input"),
-                shape = RoundedCornerShape(10.dp)
+            // --- STEP 1: COLLEGE & DEGREE PROGRAM (SAME AS UPLOAD SECTION) ---
+            Text(
+                text = "1. College & Degree Program",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = AcademicNavyPrimary
             )
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 2. Note Description (Primary focus!)
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Uploaded Note Description & Coverage") },
-                placeholder = { Text("Curate description, topics covered, units breakdown, etc.") },
-                minLines = 4,
-                maxLines = 8,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("edit_description_input"),
-                shape = RoundedCornerShape(10.dp)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 3. Subject Name
-            OutlinedTextField(
-                value = subjectName,
-                onValueChange = { subjectName = it },
-                label = { Text("Subject Name / Paper") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("edit_subject_name_input"),
-                shape = RoundedCornerShape(10.dp)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 4. Course Name
-            OutlinedTextField(
-                value = courseName,
-                onValueChange = { courseName = it },
-                label = { Text("Degree Course") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 5. Academic Year Selector
-            Text(text = "Academic Year:", style = MaterialTheme.typography.labelMedium, color = NaturalTextSecondary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(1, 2, 3, 4).forEach { yr ->
-                    FilterChip(
-                        selected = academicYear == yr,
-                        onClick = { academicYear = yr },
-                        label = { Text("Year $yr") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AcademicNavyPrimary,
-                            selectedLabelColor = Color.White
+            // College Picker
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    onClick = { showCollegeMenu = true },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("admin_edit_college_select"),
+                    colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Campus / College",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = AcademicNavyPrimary
+                                )
+                                Text(
+                                    text = " *",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = EditorialError
+                                )
+                            }
+                            Text(
+                                text = selectedCollege.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = NaturalTextPrimary
+                            )
+                        }
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NaturalTextSecondary)
+                    }
+                }
+                DropdownMenu(expanded = showCollegeMenu, onDismissRequest = { showCollegeMenu = false }) {
+                    AcademicCatalog.COLLEGES.forEach { col ->
+                        DropdownMenuItem(
+                            text = { Text(col.name, color = NaturalTextPrimary) },
+                            onClick = {
+                                selectedCollege = col
+                                val newCourses = AcademicCatalog.getCoursesForCollege(col.id)
+                                selectedCourse = newCourses.firstOrNull() ?: selectedCourse
+                                val newYears = AcademicCatalog.getYearsForCourse(selectedCourse)
+                                selectedYear = newYears.firstOrNull() ?: selectedYear
+                                selectedSemester = selectedYear.semesters.firstOrNull() ?: 1
+                                showCollegeMenu = false
+                            }
                         )
-                    )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 6. Semester Selector
-            Text(text = "Semester:", style = MaterialTheme.typography.labelMedium, color = NaturalTextSecondary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(1, 2, 3, 4, 5, 6, 7, 8).forEach { sem ->
-                    FilterChip(
-                        selected = semester == sem,
-                        onClick = { semester = sem },
-                        label = { Text("S$sem") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AcademicNavyPrimary,
-                            selectedLabelColor = Color.White
+            // Course Picker
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    onClick = { showCourseMenu = true },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("admin_edit_course_select"),
+                    colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Degree Course",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = AcademicNavyPrimary
+                                )
+                                Text(
+                                    text = " *",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = EditorialError
+                                )
+                            }
+                            Text(
+                                text = selectedCourse.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = NaturalTextPrimary
+                            )
+                        }
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NaturalTextSecondary)
+                    }
+                }
+                DropdownMenu(expanded = showCourseMenu, onDismissRequest = { showCourseMenu = false }) {
+                    availableCourses.forEach { crs ->
+                        DropdownMenuItem(
+                            text = { Text(crs.name, color = NaturalTextPrimary) },
+                            onClick = {
+                                selectedCourse = crs
+                                val newYears = AcademicCatalog.getYearsForCourse(crs)
+                                selectedYear = newYears.firstOrNull() ?: selectedYear
+                                selectedSemester = selectedYear.semesters.firstOrNull() ?: 1
+                                showCourseMenu = false
+                            }
                         )
-                    )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // 7. Resource Type
-            Text(text = "Resource Material Type:", style = MaterialTheme.typography.labelMedium, color = NaturalTextSecondary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Academic Year Dropdown Picker (All 4 Years supported, responsive)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    onClick = { showYearMenu = true },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("admin_edit_year_select"),
+                    colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Academic Year",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = AcademicNavyPrimary
+                                )
+                                Text(
+                                    text = " *",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = EditorialError
+                                )
+                            }
+                            Text(
+                                text = selectedYear.label,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = NaturalTextPrimary
+                            )
+                        }
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NaturalTextSecondary)
+                    }
+                }
+                DropdownMenu(expanded = showYearMenu, onDismissRequest = { showYearMenu = false }) {
+                    availableYears.forEach { yr ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = yr.label,
+                                    color = NaturalTextPrimary,
+                                    fontWeight = if (selectedYear.yearNumber == yr.yearNumber) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                selectedYear = yr
+                                if (!yr.semesters.contains(selectedSemester)) {
+                                    selectedSemester = yr.semesters.firstOrNull() ?: 1
+                                }
+                                showYearMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Semester Selection Chips
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Academic Semester",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = AcademicNavyPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    selectedYear.semesters.forEach { sem ->
+                        FilterChip(
+                            selected = selectedSemester == sem,
+                            onClick = { selectedSemester = sem },
+                            label = { Text("Semester $sem") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AcademicNavyPrimary,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+
+            // --- STEP 2: SUBJECT DETAILS (NO TITLE / DETAILED DESCRIPTION INPUTS) ---
+            Spacer(modifier = Modifier.height(22.dp))
+            Text(
+                text = "2. Subject Details",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = AcademicNavyPrimary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Subject Name / Paper Title - REQUIRED (*)
+            OutlinedTextField(
+                value = subjectName,
+                onValueChange = { subjectName = it },
+                label = {
+                    Row {
+                        Text("Subject Name / Paper Title")
+                        Text(" *", color = EditorialError, fontWeight = FontWeight.Bold)
+                    }
+                },
+                placeholder = { Text("e.g. Data Structures & Algorithms, Engineering Chemistry") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("admin_edit_subject_name_input"),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AcademicNavyPrimary,
+                    focusedLabelColor = AcademicNavyPrimary
+                )
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Subject Code & Topic Coverage (Optional)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = subjectCode,
+                    onValueChange = { subjectCode = it },
+                    label = { Text("Paper Code (Optional)") },
+                    placeholder = { Text("e.g. BCS-301") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                OutlinedTextField(
+                    value = topicUnitCoverage,
+                    onValueChange = { topicUnitCoverage = it },
+                    label = { Text("Units / Coverage") },
+                    placeholder = { Text("e.g. Full Syllabus") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+
+            // --- STEP 3: RESOURCE MATERIAL & TYPE ---
+            Spacer(modifier = Modifier.height(22.dp))
+            Text(
+                text = "3. Resource Material & Type",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = AcademicNavyPrimary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Resource Type Chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 ResourceType.values().forEach { type ->
                     FilterChip(
                         selected = resourceType == type,
@@ -1189,22 +1518,68 @@ fun AdminEditSubmissionBottomSheet(
                 }
             }
 
-            // Exam Year (if PYQ)
             if (resourceType == ResourceType.PYQ) {
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedTextField(
                     value = examYear,
                     onValueChange = { examYear = it },
                     label = { Text("Exam Session / Year") },
-                    placeholder = { Text("e.g. 2023-2024") },
+                    placeholder = { Text("e.g. 2023-2024 End Semester Examination") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // 8. Contributor Info
+            // Attached File Info Card with Preview in Google Drive
+            Card(
+                colors = CardDefaults.cardColors(containerColor = AcademicNavyContainer),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        tint = AcademicNavyPrimary
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = submission.fileName ?: "Uploaded_Document.pdf",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = NaturalTextPrimary,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = "${submission.fileSizeFormatted ?: "Ready"} • Stored in Google Drive",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NaturalTextSecondary
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            com.example.util.DocumentViewerUtil.openSubmissionDocument(context, submission)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = "Preview Document",
+                            tint = AcademicNavyPrimary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Contributor Identity
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1212,40 +1587,63 @@ fun AdminEditSubmissionBottomSheet(
                 OutlinedTextField(
                     value = contributorName,
                     onValueChange = { contributorName = it },
-                    label = { Text("Contributor Name") },
-                    modifier = Modifier.weight(1f),
+                    label = {
+                        Row {
+                            Text("Uploader Name")
+                            Text(" *", color = EditorialError, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    modifier = Modifier.weight(1.2f),
                     shape = RoundedCornerShape(10.dp)
                 )
 
                 OutlinedTextField(
                     value = contributorEmail,
                     onValueChange = { contributorEmail = it },
-                    label = { Text("Contributor Email") },
-                    modifier = Modifier.weight(1f),
+                    label = { Text("Email (Optional)") },
+                    modifier = Modifier.weight(1.2f),
                     shape = RoundedCornerShape(10.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 9. Admin Feedback / Notes
+            // Admin Review Notes / Feedback
             OutlinedTextField(
                 value = adminFeedback,
                 onValueChange = { adminFeedback = it },
                 label = { Text("Admin Feedback / Review Notes") },
+                placeholder = { Text("e.g. Verified by CSJMU Academic Admin") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Automatically format title and description based on subject and curriculum
+            val effectiveCode = if (subjectCode.trim().isNotBlank()) " [${subjectCode.trim()}]" else ""
+            val finalSubjectName = "${subjectName.trim()}$effectiveCode"
+            val effectiveTitle = "${resourceType.displayName} - ${subjectName.trim()}"
+            val effectiveDescription = buildString {
+                if (topicUnitCoverage.trim().isNotBlank()) {
+                    append("Coverage: ${topicUnitCoverage.trim()}\n\n")
+                }
+                if (submission.description.isNotBlank()) {
+                    append(submission.description)
+                } else {
+                    append("Curated academic material for ${selectedCourse.name}, Year ${selectedYear.yearNumber}, Semester $selectedSemester.")
+                }
+            }
+
             val updatedSubmission = submission.copy(
-                title = title.trim(),
-                description = description.trim(),
-                subjectName = subjectName.trim(),
-                courseName = courseName.trim(),
-                academicYear = academicYear,
-                semester = semester,
+                title = effectiveTitle,
+                description = effectiveDescription,
+                collegeId = selectedCollege.id,
+                courseId = selectedCourse.id,
+                courseName = selectedCourse.name,
+                academicYear = selectedYear.yearNumber,
+                semester = selectedSemester,
+                subjectName = finalSubjectName,
                 resourceType = resourceType,
                 examYear = examYear.trim().takeIf { it.isNotBlank() },
                 contributorName = contributorName.trim(),
@@ -1253,45 +1651,85 @@ fun AdminEditSubmissionBottomSheet(
                 adminFeedback = adminFeedback.trim().takeIf { it.isNotBlank() }
             )
 
-            // Action Buttons: Save Changes OR Save & Approve
-            Row(
+            // Primary Action Buttons
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Save Changes
-                OutlinedButton(
-                    onClick = {
-                        onSaveEdits(updatedSubmission, false, null)
-                    },
-                    enabled = !isProcessing && title.isNotBlank() && subjectName.isNotBlank(),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("save_edits_button")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Save Changes")
-                }
-
-                // If currently pending, provide Save & Approve Now button
-                if (submission.status == ApprovalStatus.PENDING) {
-                    Button(
+                    // Save Changes Button
+                    OutlinedButton(
                         onClick = {
-                            val notes = adminFeedback.ifBlank { "Curated and approved by CSJMU admin" }
-                            onSaveEdits(updatedSubmission, true, notes)
+                            onSaveEdits(updatedSubmission, false, null)
                         },
-                        enabled = !isProcessing && title.isNotBlank() && subjectName.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = EditorialSuccess),
+                        enabled = !isProcessing && subjectName.isNotBlank() && contributorName.isNotBlank(),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .weight(1.3f)
-                            .testTag("save_and_approve_button")
+                            .weight(1f)
+                            .testTag("save_edits_button")
                     ) {
-                        Icon(Icons.Default.Publish, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Save & Publish", fontWeight = FontWeight.Bold)
+                        Text("Save Changes")
                     }
+
+                    // Save & Publish / Live Update Button
+                    if (submission.status == ApprovalStatus.PENDING) {
+                        Button(
+                            onClick = {
+                                val notes = adminFeedback.ifBlank { "Curated and approved by CSJMU admin" }
+                                onSaveEdits(updatedSubmission, true, notes)
+                            },
+                            enabled = !isProcessing && subjectName.isNotBlank() && contributorName.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = EditorialSuccess),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .testTag("save_and_approve_button")
+                        ) {
+                            Icon(Icons.Default.Publish, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Save & Publish", fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                val notes = adminFeedback.ifBlank { "Curated by CSJMU admin" }
+                                onSaveEdits(updatedSubmission, false, notes)
+                            },
+                            enabled = !isProcessing && subjectName.isNotBlank() && contributorName.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = AcademicNavyPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .testTag("save_live_button")
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Save & Update", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Delete Document Button: Permanently removes from Google Drive & Catalog
+                OutlinedButton(
+                    onClick = onDeleteClick,
+                    enabled = !isProcessing,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorialError),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(EditorialError)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("admin_delete_submission_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = EditorialError)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Document from Google Drive", color = EditorialError, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

@@ -65,6 +65,14 @@ function doPost(e) {
       case "getAllSubmissions":
         return handleGetAllSubmissions();
 
+      case "editDocument":
+      case "updateDocument":
+        return handleEditDocument(request);
+
+      case "deleteDocument":
+      case "deleteUploadedDocument":
+        return handleDeleteDocument(request);
+
       default:
         return createJsonResponse({ success: false, error: "Invalid action: " + action }, 400);
     }
@@ -293,6 +301,131 @@ function handleRejectDocument(data) {
     success: true,
     fileId: targetFileId,
     message: "Rejected file deleted from Google Drive"
+  });
+}
+
+/**
+ * 3b. Edits an uploaded or approved document in Google Drive:
+ * Updates the document metadata in canonical NotesApp/metadata.json,
+ * and synchronizes the Google Drive file name and details.
+ */
+function handleEditDocument(data) {
+  const fileId = data.fileId || data.driveFileId;
+  const submissionId = data.submissionId || data.id;
+
+  if (!fileId && !submissionId) {
+    return createJsonResponse({ success: false, error: "fileId or submissionId is required" }, 400);
+  }
+
+  const allMetadata = loadAllMetadata();
+  let matchedItem = null;
+
+  for (let i = 0; i < allMetadata.length; i++) {
+    const item = allMetadata[i];
+    const isMatch = (fileId && item.driveFileId === fileId) ||
+                    (submissionId && (item.id === submissionId || item.id === "res_" + submissionId || "res_" + item.id === submissionId));
+    if (isMatch) {
+      matchedItem = item;
+      break;
+    }
+  }
+
+  if (!matchedItem) {
+    matchedItem = {
+      id: submissionId || ("sub_" + Utilities.getUuid()),
+      driveFileId: fileId || ""
+    };
+    allMetadata.push(matchedItem);
+  }
+
+  // Update fields
+  if (data.title !== undefined) matchedItem.title = data.title;
+  if (data.description !== undefined) matchedItem.description = data.description;
+  if (data.collegeId !== undefined) matchedItem.collegeId = data.collegeId;
+  if (data.courseId !== undefined) matchedItem.courseId = data.courseId;
+  if (data.courseName !== undefined) matchedItem.courseName = data.courseName;
+  if (data.academicYear !== undefined) matchedItem.academicYear = Number(data.academicYear);
+  if (data.semester !== undefined) matchedItem.semester = Number(data.semester);
+  if (data.subjectId !== undefined) matchedItem.subjectId = data.subjectId;
+  if (data.subjectName !== undefined) matchedItem.subjectName = data.subjectName;
+  if (data.resourceType !== undefined) matchedItem.resourceType = data.resourceType;
+  if (data.examYear !== undefined) matchedItem.examYear = data.examYear;
+  if (data.contributorName !== undefined) matchedItem.contributorName = data.contributorName;
+  if (data.contributorEmail !== undefined) matchedItem.contributorEmail = data.contributorEmail;
+  if (data.adminFeedback !== undefined) matchedItem.adminFeedback = data.adminFeedback;
+  if (data.status !== undefined) {
+    matchedItem.status = data.status;
+    matchedItem.isApproved = (data.status === "APPROVED");
+  }
+  matchedItem.updatedTimestamp = new Date().getTime();
+
+  // If Drive file exists, update file name if subject changed
+  const targetFileId = matchedItem.driveFileId || fileId;
+  if (targetFileId) {
+    try {
+      const file = DriveApp.getFileById(targetFileId);
+      if (data.fileName && data.fileName.trim().length > 0) {
+        file.setName(data.fileName.trim());
+        matchedItem.fileName = data.fileName.trim();
+      } else if (data.subjectName && data.subjectName.trim().length > 0) {
+        const oldName = file.getName();
+        const ext = oldName.indexOf('.') !== -1 ? oldName.split('.').pop() : "pdf";
+        const newName = (data.subjectName + "_" + (data.resourceType || "NOTES") + "." + ext).replace(/[^a-zA-Z0-9._-]/g, "_");
+        file.setName(newName);
+        matchedItem.fileName = newName;
+      }
+    } catch (e) {}
+  }
+
+  saveAllMetadata(allMetadata);
+
+  return createJsonResponse({
+    success: true,
+    fileId: targetFileId,
+    message: "Document edited and synced to Google Drive metadata successfully",
+    item: matchedItem
+  });
+}
+
+/**
+ * 3c. Permanently deletes an uploaded/approved document from Google Drive (trashes the file)
+ * and purges it completely from NotesApp/metadata.json.
+ */
+function handleDeleteDocument(data) {
+  const fileId = data.fileId || data.driveFileId;
+  const submissionId = data.submissionId || data.id;
+
+  if (!fileId && !submissionId) {
+    return createJsonResponse({ success: false, error: "fileId or submissionId is required" }, 400);
+  }
+
+  const allMetadata = loadAllMetadata();
+  let matchedFileId = fileId;
+  const filtered = allMetadata.filter(function(item) {
+    const isMatch = (fileId && item.driveFileId === fileId) ||
+                    (submissionId && (item.id === submissionId || item.id === "res_" + submissionId || "res_" + item.id === submissionId));
+    if (isMatch && item.driveFileId) {
+      matchedFileId = item.driveFileId;
+    }
+    return !isMatch;
+  });
+
+  // Permanently trash the file in Google Drive
+  if (matchedFileId) {
+    try {
+      const file = DriveApp.getFileById(matchedFileId);
+      file.setTrashed(true);
+    } catch (err) {}
+  }
+
+  saveAllMetadata(filtered);
+
+  return createJsonResponse({
+    success: true,
+    fileId: matchedFileId,
+    deletedFromDrive: true,
+    remainingCount: filtered.length,
+    message: "Document permanently deleted from Google Drive and purged from metadata"
   });
 }
 

@@ -29,6 +29,8 @@ interface ISubmissionRepository {
 
     suspend fun rejectSubmission(submissionId: String, rejectionReason: String): Result<Unit>
 
+    suspend fun deleteSubmission(submissionId: String): Result<Unit>
+
     fun getSubmissionById(id: String): Flow<Submission?>
 
     suspend fun syncFromRemote(): Result<Unit>

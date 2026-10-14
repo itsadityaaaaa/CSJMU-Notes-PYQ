@@ -13,6 +13,7 @@ import com.example.domain.model.Course
 import com.example.domain.model.ResourceType
 import com.example.domain.model.Submission
 import com.example.domain.usecase.SubmitNoteUseCase
+import com.example.util.AnalyticsHelper
 import com.example.util.FileCompressionUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -379,6 +380,12 @@ class UploadViewModel(
 
             val result = submitNoteUseCase(submission)
             if (result.isSuccess) {
+                AnalyticsHelper.logDocumentUpload(
+                    course = submission.courseName,
+                    year = submission.academicYear,
+                    subject = submission.subjectName,
+                    type = submission.resourceType.name
+                )
                 _formState.value = state.copy(
                     isSubmitting = false,
                     submissionSuccessId = result.getOrNull(),

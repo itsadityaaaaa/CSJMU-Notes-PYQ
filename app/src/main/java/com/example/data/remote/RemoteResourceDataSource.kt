@@ -72,6 +72,10 @@ interface IRemoteResourceDataSource {
     suspend fun approveDocumentInDrive(driveFileId: String?): Result<Unit>
 
     suspend fun rejectDocumentInDrive(driveFileId: String?): Result<Unit>
+
+    suspend fun editDocumentInDrive(submission: Submission): Result<Unit>
+
+    suspend fun deleteDocumentInDrive(driveFileId: String?, submissionId: String?): Result<Unit>
 }
 
 class RemoteResourceDataSourceImpl(
@@ -620,6 +624,64 @@ class RemoteResourceDataSourceImpl(
                 .build()
 
             httpClient.newCall(request).execute().close()
+        }
+    }
+
+    override suspend fun editDocumentInDrive(submission: Submission): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (backendUrl.isNullOrBlank()) return@runCatching
+
+            val jsonPayload = JSONObject().apply {
+                put("action", "editDocument")
+                put("fileId", submission.driveFileId ?: "")
+                put("submissionId", submission.id)
+                put("title", submission.title)
+                put("description", submission.description)
+                put("collegeId", submission.collegeId)
+                put("courseId", submission.courseId)
+                put("courseName", submission.courseName)
+                put("academicYear", submission.academicYear)
+                put("semester", submission.semester)
+                put("subjectId", submission.subjectId)
+                put("subjectName", submission.subjectName)
+                put("resourceType", submission.resourceType.name)
+                put("examYear", submission.examYear ?: "")
+                put("fileName", submission.fileName ?: "")
+                put("contributorName", submission.contributorName)
+                put("contributorEmail", submission.contributorEmail ?: "")
+                put("adminFeedback", submission.adminFeedback ?: "")
+                put("status", submission.status.name)
+            }
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val request = Request.Builder()
+                .url(backendUrl)
+                .post(jsonPayload.toString().toRequestBody(mediaType))
+                .build()
+
+            httpClient.newCall(request).execute().close()
+            Log.i(TAG, "Document ${submission.id} successfully edited in Google Drive backend")
+        }
+    }
+
+    override suspend fun deleteDocumentInDrive(driveFileId: String?, submissionId: String?): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (backendUrl.isNullOrBlank()) return@runCatching
+
+            val jsonPayload = JSONObject().apply {
+                put("action", "deleteDocument")
+                put("fileId", driveFileId ?: "")
+                put("submissionId", submissionId ?: "")
+            }
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val request = Request.Builder()
+                .url(backendUrl)
+                .post(jsonPayload.toString().toRequestBody(mediaType))
+                .build()
+
+            httpClient.newCall(request).execute().close()
+            Log.i(TAG, "Document ${submissionId ?: driveFileId} successfully deleted from Google Drive backend")
         }
     }
 

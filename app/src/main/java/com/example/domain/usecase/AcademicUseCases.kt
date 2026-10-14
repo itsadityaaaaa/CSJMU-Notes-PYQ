@@ -72,4 +72,8 @@ class ModerateSubmissionUseCase(
         }
         return submissionRepository.rejectSubmission(submissionId, reason)
     }
+
+    suspend fun delete(submissionId: String): Result<Unit> {
+        return submissionRepository.deleteSubmission(submissionId)
+    }
 }

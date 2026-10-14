@@ -7,6 +7,7 @@ import com.example.domain.model.ApprovalStatus
 import com.example.domain.model.Submission
 import com.example.domain.repository.ISubmissionRepository
 import com.example.domain.usecase.ModerateSubmissionUseCase
+import com.example.util.AnalyticsHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -242,10 +243,32 @@ class AdminViewModel(
                     selectedSubmissionForEdit = null,
                     actionSuccessMessage = "Submission rejected with feedback sent to student."
                 )
+                AnalyticsHelper.logAdminAction("reject_document", submissionId)
             } else {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     actionErrorMessage = result.exceptionOrNull()?.message ?: "Failed to reject submission"
+                )
+            }
+        }
+    }
+
+    fun deleteSubmission(submissionId: String) {
+        _uiState.value = _uiState.value.copy(isProcessing = true, actionErrorMessage = null)
+        viewModelScope.launch {
+            val result = moderateSubmissionUseCase.delete(submissionId)
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    selectedSubmissionForReview = null,
+                    selectedSubmissionForEdit = null,
+                    actionSuccessMessage = "Document permanently deleted from Google Drive and CSJMU catalog."
+                )
+                AnalyticsHelper.logAdminAction("delete_document_from_drive", submissionId)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    actionErrorMessage = result.exceptionOrNull()?.message ?: "Failed to delete document from Google Drive"
                 )
             }
         }

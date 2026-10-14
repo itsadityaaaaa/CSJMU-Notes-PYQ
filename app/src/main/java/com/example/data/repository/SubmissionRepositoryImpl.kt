@@ -155,6 +155,11 @@ class SubmissionRepositoryImpl(
     override suspend fun updateSubmission(submission: Submission): Result<Unit> {
         return runCatching {
             submissionDao.updateSubmission(SubmissionEntity.fromDomain(submission))
+            
+            // Sync edits directly to Google Drive backend (Drive file & metadata.json)
+            remoteDataSource.editDocumentInDrive(submission)
+            
+            // Sync edits to Firestore
             remoteDataSource.submitNoteToRemote(submission)
 
             // If this submission was already approved, update the published Resource as well
@@ -296,6 +301,25 @@ class SubmissionRepositoryImpl(
                 status = ApprovalStatus.REJECTED,
                 adminNotes = rejectionReason
             )
+        }
+    }
+
+    override suspend fun deleteSubmission(submissionId: String): Result<Unit> {
+        return runCatching {
+            val entity = submissionDao.findSubmissionById(submissionId)
+            val driveId = entity?.driveFileId
+
+            // 1. Permanently delete from Google Drive via Apps Script backend
+            remoteDataSource.deleteDocumentInDrive(driveId, submissionId)
+
+            // 2. Delete from local SQLite Room DB
+            submissionDao.deleteSubmission(submissionId)
+            resourceDao.deleteById(submissionId)
+            resourceDao.deleteById("res_$submissionId")
+
+            // 3. Delete from remote Firestore collections
+            remoteDataSource.deleteResourceFromRemote(submissionId)
+            remoteDataSource.deleteResourceFromRemote("res_$submissionId")
         }
     }
 

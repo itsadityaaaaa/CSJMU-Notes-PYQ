@@ -68,6 +68,7 @@ import com.example.domain.usecase.ModerateSubmissionUseCase
 import com.example.domain.usecase.SearchResourcesUseCase
 import com.example.domain.usecase.SubmitNoteUseCase
 import com.example.ui.components.AcademicHeader
+import com.example.util.AnalyticsHelper
 import com.example.ui.screens.AdminScreen
 import com.example.ui.screens.ExploreScreen
 import com.example.ui.screens.SubmissionsScreen
@@ -98,6 +99,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // 0. Initialize Firebase Analytics
+        AnalyticsHelper.initialize(applicationContext)
 
         // 1. Local Database & Remote Firestore Data Source
         val database = AppDatabase.getInstance(applicationContext)
@@ -160,6 +164,11 @@ fun MainApp(
     val allSubmissions by adminViewModel.allSubmissions.collectAsState()
     val adminUiState by adminViewModel.uiState.collectAsState()
     val pendingCount = allSubmissions.count { it.status == com.example.domain.model.ApprovalStatus.PENDING }
+
+    // Log screen view in Firebase Analytics for active user tracking
+    LaunchedEffect(currentTab) {
+        AnalyticsHelper.logScreenView(currentTab.name)
+    }
 
     // Android back navigation: Return to Explore if currently on another tab
     BackHandler(enabled = currentTab != NavigationTab.EXPLORE) {
