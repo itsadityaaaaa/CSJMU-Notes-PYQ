@@ -64,6 +64,8 @@ import com.example.ui.components.EmptyStateView
 import com.example.ui.components.ResourceCard
 import com.example.ui.theme.HeritageWinePrimary
 import com.example.ui.viewmodel.ResourceViewModel
+import com.example.util.AnalyticsHelper
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +89,28 @@ fun ExploreScreen(
     // Synchronize catalog from cloud on load
     LaunchedEffect(Unit) {
         viewModel.refresh()
+    }
+
+    // Debounced search term tracking in Firebase Analytics
+    LaunchedEffect(filterState.searchQuery) {
+        if (filterState.searchQuery.isNotBlank()) {
+            delay(1200)
+            AnalyticsHelper.logSearch(filterState.searchQuery, resources.size)
+        }
+    }
+
+    // Filter selection tracking in Firebase Analytics
+    LaunchedEffect(filterState.selectedCollege, filterState.selectedCourse, filterState.selectedYear, filterState.selectedSemester) {
+        AnalyticsHelper.logFilterSelect(
+            college = filterState.selectedCollege.shortCode,
+            course = filterState.selectedCourse.name,
+            year = filterState.selectedYear.yearNumber,
+            semester = filterState.selectedSemester ?: 0
+        )
+        AnalyticsHelper.setUserAcademicPreference(
+            course = filterState.selectedCourse.name,
+            year = filterState.selectedYear.yearNumber
+        )
     }
 
     Column(

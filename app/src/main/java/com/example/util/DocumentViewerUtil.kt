@@ -82,6 +82,14 @@ object DocumentViewerUtil {
      * Opens a Resource document cleanly on any device.
      */
     fun openResourceDocument(context: Context, resource: ResourceItem) {
+        AnalyticsHelper.logDocumentView(
+            resourceId = resource.id,
+            title = resource.title,
+            course = resource.courseId,
+            academicYear = resource.academicYear,
+            resourceType = resource.resourceType.name
+        )
+
         val driveId = resource.driveFileId ?: extractDriveFileId(resource.driveFileUrl) ?: extractDriveFileId(resource.fileUri)
         val cloudUrl = getPreviewUrl(resource.driveFileUrl ?: resource.fileUri, driveId)
 
@@ -158,6 +166,12 @@ object DocumentViewerUtil {
      * Downloads the document to the device's public Downloads directory using Android DownloadManager.
      */
     fun downloadResourceDocument(context: Context, resource: ResourceItem) {
+        AnalyticsHelper.logDocumentDownload(
+            resourceId = resource.id,
+            title = resource.title,
+            resourceType = resource.resourceType.name
+        )
+
         val driveId = resource.driveFileId ?: extractDriveFileId(resource.driveFileUrl) ?: extractDriveFileId(resource.fileUri)
         val downloadUrl = getDirectDownloadUrl(resource.driveFileUrl ?: resource.fileUri, driveId)
 

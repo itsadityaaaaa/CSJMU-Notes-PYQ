@@ -34,26 +34,29 @@ object AnalyticsHelper {
         }
     }
 
-    fun logDocumentView(resourceId: String, title: String, course: String, academicYear: Int) {
+    fun logDocumentView(resourceId: String, title: String, course: String, academicYear: Int, resourceType: String = "NOTE") {
         runCatching {
             firebaseAnalytics?.let { analytics ->
                 val bundle = Bundle().apply {
                     putString(FirebaseAnalytics.Param.ITEM_ID, resourceId)
                     putString(FirebaseAnalytics.Param.ITEM_NAME, title.take(100))
                     putString(FirebaseAnalytics.Param.ITEM_CATEGORY, course)
+                    putString(FirebaseAnalytics.Param.CONTENT_TYPE, resourceType)
                     putInt("academic_year", academicYear)
                 }
                 analytics.logEvent(FirebaseAnalytics.Event.SELECT_CONTENT, bundle)
+                analytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, bundle)
             }
         }
     }
 
-    fun logDocumentDownload(resourceId: String, title: String) {
+    fun logDocumentDownload(resourceId: String, title: String, resourceType: String = "NOTE") {
         runCatching {
             firebaseAnalytics?.let { analytics ->
                 val bundle = Bundle().apply {
                     putString(FirebaseAnalytics.Param.ITEM_ID, resourceId)
                     putString(FirebaseAnalytics.Param.ITEM_NAME, title.take(100))
+                    putString(FirebaseAnalytics.Param.CONTENT_TYPE, resourceType)
                 }
                 analytics.logEvent("document_download", bundle)
             }
@@ -70,6 +73,42 @@ object AnalyticsHelper {
                     putString("resource_type", type)
                 }
                 analytics.logEvent("document_uploaded", bundle)
+            }
+        }
+    }
+
+    fun logSearch(query: String, resultCount: Int) {
+        if (query.isBlank()) return
+        runCatching {
+            firebaseAnalytics?.let { analytics ->
+                val bundle = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.SEARCH_TERM, query.take(100))
+                    putInt("result_count", resultCount)
+                }
+                analytics.logEvent(FirebaseAnalytics.Event.SEARCH, bundle)
+            }
+        }
+    }
+
+    fun logFilterSelect(college: String, course: String, year: Int, semester: Int) {
+        runCatching {
+            firebaseAnalytics?.let { analytics ->
+                val bundle = Bundle().apply {
+                    putString("college", college)
+                    putString("course", course)
+                    putInt("academic_year", year)
+                    putInt("semester", semester)
+                }
+                analytics.logEvent("catalog_filter_applied", bundle)
+            }
+        }
+    }
+
+    fun setUserAcademicPreference(course: String, year: Int) {
+        runCatching {
+            firebaseAnalytics?.apply {
+                setUserProperty("preferred_course", course)
+                setUserProperty("academic_year", year.toString())
             }
         }
     }
