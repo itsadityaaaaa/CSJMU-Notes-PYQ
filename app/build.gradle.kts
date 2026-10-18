@@ -13,7 +13,7 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.aistudio.csjmunotes.pyqapp"
+    applicationId = "com.csjmu.notespyq"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
